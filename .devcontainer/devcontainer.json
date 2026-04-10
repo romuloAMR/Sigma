@@ -1,0 +1,21 @@
+{
+  "name": "Sigma lang",
+  "image": "haskell:9.14-bookworm",
+  "runArgs": [
+    "--privileged"
+  ],
+  "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "haskell.manageHLS": "GHCup",
+        "haskell.plugin.ghcide.completions.config.snippetsOn": true
+      },
+      "extensions": [
+        "haskell.haskell"
+      ]
+    }
+  },
+  "remoteUser": "root",
+  "postCreateCommand": "make info"
+}
