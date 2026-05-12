@@ -8,3 +8,5 @@ An interpreted language with a focus on applied mathematics and numerical comput
 ## Stack :books:
 The following technologies were used to develop the language:
 - Haskell
+- Cabal
+- Alex
