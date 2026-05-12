@@ -17,5 +17,5 @@
     }
   },
   "remoteUser": "root",
-  "postCreateCommand": "make info"
+  "postCreateCommand": "cabal update && cabal install alex happy && make info"
 }

@@ -1,4 +1,8 @@
-module Main (main) where
+module Main where
+
+import Sigma.Lexer
 
 main :: IO ()
-main = putStrLn "God is faithful!"
+main = do
+  input <- getContents
+  print (alexScanTokens input)
