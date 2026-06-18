@@ -1,0 +1,40 @@
+fun main () {
+   numbers: int[] = listOf(10, 2, 3, 4, 5, 21, 12, 1002, 42, 67);
+   quickSort(numbers, 0, numbers.size - 1);
+   print(numbers);
+}
+
+
+fun quickSort(vector: int[], start: int, end: int): none  {
+   if (start < end) {
+       indexPartition: int = partition(vector, start, end);
+       quickSort(vector, start, indexPartition - 1);
+       quickSort(vector, indexPartition + 1, end);
+   }
+
+
+}
+
+
+fun partition(vector: int[], start: int, end: int): int {
+   pivot: int = vector[end];
+   i: int = start - 1;
+
+
+   for (j: int = start; j < end; j++) {
+       if (vector[j] <= pivot) {
+           i++;
+           temp: int = vector[i];
+           vector[i] = vector[j];
+           vector[j] = temp;
+       }
+   }
+
+
+   temp: int = vector[i + 1];
+   vector[i + 1] = vector[end];
+   vector[end] = temp;
+
+
+   return i + 1;
+}
