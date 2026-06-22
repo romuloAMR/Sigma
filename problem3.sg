@@ -1,0 +1,53 @@
+fun main() {
+    linhasA: int = int(read());
+    colunasA: int = int(read());
+
+    matrizA: float[][] = matrizFloat(linhasA, colunasA);
+    for (i: int = 0; i < linhasA; i++) {
+        for (j: int = 0; j < colunasA; j++) {
+            matrizA[i][j] = float(read());
+        }
+    }
+
+    linhasB: int = int(read());
+    colunasB: int = int(read());
+
+    matrizB: float[][] = matrizFloat(linhasB, colunasB);
+    for (i: int = 0; i < linhasB; i++) {
+        for (j: int = 0; j < colunasB; j++) {
+            matrizB[i][j] = float(read());
+        }
+    }
+
+    if (linhasA == linhasB and colunasA == colunasB) {
+        matrizSoma: float[][] = matrizFloat(linhasA, colunasA);
+        
+        for (i: int = 0; i < linhasA; i++) {
+            for (j: int = 0; j < colunasA; j++) {
+                matrizSoma[i][j] = matrizA[i][j] + matrizB[i][j];
+            }
+        }
+        print("Soma das matrizes:");
+        print(matrizSoma);
+    } else {
+        print("Nao eh possivel somar as matrizes: dimensoes diferentes.");
+    }
+
+    if (colunasA == linhasB) {
+        matrizProduto: float[][] = matrizFloat(linhasA, colunasB);
+
+        for (i: int = 0; i < linhasA; i++) {
+            for (j: int = 0; j < colunasB; j++) {
+                somaTermos: float = 0.0;
+                for (k: int = 0; k < colunasA; k++) {
+                    somaTermos = somaTermos + (matrizA[i][k] * matrizB[k][j]);
+                }
+                matrizProduto[i][j] = somaTermos;
+            }
+        }
+        print("Produto das matrizes:");
+        print(matrizProduto);
+    } else {
+        print("Nao eh possivel multiplicar as matrizes: colunas de A diferente de linhas de B.");
+    }
+}

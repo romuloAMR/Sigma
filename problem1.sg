@@ -1,0 +1,9 @@
+fun main() {
+    x: float = 5.5;
+    y: float = 2.3;
+    c: int = 10;
+
+    resultado: float = (x * x) - y + c;
+
+    print(resultado);
+}
