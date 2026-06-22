@@ -1,200 +1,262 @@
 module Main (main) where
 
-import Lexer
+import Sigma.Lexer
 import Text.Parsec
 import Control.Monad.IO.Class
 import Text.Parsec.Pos
 import System.Environment
 
--- parsers para os tokens
-
-programToken = tokenPrim show update_pos get_token where
-  -- get_token (Token p Program) = Just (Token p Program)
-  get_token token@(Token p Program) = Just token
-  get_token _ = Nothing
-
-idToken = tokenPrim show update_pos get_token where
-  get_token token@(Token p (Id x)) = Just token
-  get_token _  = Nothing
-
-varToken = tokenPrim show update_pos get_token where
-  get_token token@(Token p Var) = Just token
-  get_token _ = Nothing  
-
-beginToken = tokenPrim show update_pos get_token where
-  get_token token@(Token p Begin) = Just token
-  get_token _ = Nothing
-
-endToken = tokenPrim show update_pos get_token where
-  get_token token@(Token p End) = Just token
-  get_token _ = Nothing
-
-semiColonToken :: ParsecT [Token] st IO (Token)
-semiColonToken = tokenPrim show update_pos get_token where
-  get_token token@(Token p SemiColon) = Just token
-  get_token _ = Nothing
-
-colonToken = tokenPrim show update_pos get_token where
-  get_token token@(Token _ Colon) = Just token
-  get_token _ = Nothing
-
-assignToken = tokenPrim show update_pos get_token where
-  get_token token@(Token _ Assign) = Just token
-  get_token _ = Nothing
-
-intToken = tokenPrim show update_pos get_token where
-  get_token token@(Token _ (Int _)) = Just token
-  get_token _ = Nothing
-
-boolToken = tokenPrim show update_pos get_token where
-  get_token token@(Token _ (Bool _)) = Just token
-  get_token _ = Nothing
-
-typeToken = tokenPrim show update_pos get_token where
-  get_token token@(Token _ (Type x)) = Just token
-  get_token _ = Nothing 
-
-addToken = tokenPrim show update_pos get_token where
-  get_token token@(Token _ Add) = Just token
-  get_token _       = Nothing   
-
 update_pos :: SourcePos -> Token -> [Token] -> SourcePos
 update_pos sp _ (Token (AlexPn _ line col) _ : _) = newPos (sourceName sp) line col
-update_pos pos _ [] = pos
+update_pos pos _ []                                = pos
 
--- parsers para os não-terminais
+funToken :: ParsecT [Token] Env IO Token
+funToken = tokenPrim show update_pos get_token where
+  get_token token@(Token _ Fun) = Just token
+  get_token _                   = Nothing
 
-program :: ParsecT [Token] [(Token,Token)] IO ([Token])
+idToken :: ParsecT [Token] Env IO Token
+idToken = tokenPrim show update_pos get_token where
+  get_token token@(Token _ (Id _)) = Just token
+  get_token _                      = Nothing
+
+lpToken :: ParsecT [Token] Env IO Token
+lpToken = tokenPrim show update_pos get_token where
+  get_token token@(Token _ LP) = Just token
+  get_token _                  = Nothing
+
+rpToken :: ParsecT [Token] Env IO Token
+rpToken = tokenPrim show update_pos get_token where
+  get_token token@(Token _ RP) = Just token
+  get_token _                  = Nothing
+
+lcbToken :: ParsecT [Token] Env IO Token
+lcbToken = tokenPrim show update_pos get_token where
+  get_token token@(Token _ LCB) = Just token
+  get_token _                   = Nothing
+
+rcbToken :: ParsecT [Token] Env IO Token
+rcbToken = tokenPrim show update_pos get_token where
+  get_token token@(Token _ RCB) = Just token
+  get_token _                   = Nothing
+
+semicolonToken :: ParsecT [Token] Env IO Token
+semicolonToken = tokenPrim show update_pos get_token where
+  get_token token@(Token _ Semicolon) = Just token
+  get_token _                         = Nothing
+
+colonToken :: ParsecT [Token] Env IO Token
+colonToken = tokenPrim show update_pos get_token where
+  get_token token@(Token _ Colon) = Just token
+  get_token _                     = Nothing
+
+assignToken :: ParsecT [Token] Env IO Token
+assignToken = tokenPrim show update_pos get_token where
+  get_token token@(Token _ Assign) = Just token
+  get_token _                      = Nothing
+
+printToken :: ParsecT [Token] Env IO Token
+printToken = tokenPrim show update_pos get_token where
+  get_token token@(Token _ Print) = Just token
+  get_token _                     = Nothing
+
+addToken :: ParsecT [Token] Env IO Token
+addToken = tokenPrim show update_pos get_token where
+  get_token token@(Token _ Add) = Just token
+  get_token _                   = Nothing
+
+subToken :: ParsecT [Token] Env IO Token
+subToken = tokenPrim show update_pos get_token where
+  get_token token@(Token _ Sub) = Just token
+  get_token _                   = Nothing
+
+multToken :: ParsecT [Token] Env IO Token
+multToken = tokenPrim show update_pos get_token where
+  get_token token@(Token _ Mult) = Just token
+  get_token _                    = Nothing
+
+divToken :: ParsecT [Token] Env IO Token
+divToken = tokenPrim show update_pos get_token where
+  get_token token@(Token _ Div) = Just token
+  get_token _                   = Nothing
+
+intLitToken :: ParsecT [Token] Env IO Token
+intLitToken = tokenPrim show update_pos get_token where
+  get_token token@(Token _ (IntLit _)) = Just token
+  get_token _                          = Nothing
+
+floatLitToken :: ParsecT [Token] Env IO Token
+floatLitToken = tokenPrim show update_pos get_token where
+  get_token token@(Token _ (FloatLit _)) = Just token
+  get_token _                            = Nothing
+
+typeToken :: ParsecT [Token] Env IO Token
+typeToken = tokenPrim show update_pos get_token where
+  get_token token@(Token _ TInt)    = Just token
+  get_token token@(Token _ TFloat)  = Just token
+  get_token token@(Token _ TBool)   = Just token
+  get_token token@(Token _ TString) = Just token
+  get_token _                       = Nothing
+
+-- ─────────────────────────────────────────────────────────────────────────────
+
+data Value = VFloat Double | VString String
+  deriving (Show, Eq)
+
+-- Tabela de símbolos: lista de (nome, valor)
+type Env = [(String, Value)]
+
+env_insert :: String -> Value -> Env -> Env
+env_insert name val env = env ++ [(name, val)]
+
+env_update :: String -> Value -> Env -> Env
+env_update name val []            = error ("variável não declarada: " ++ name)
+env_update name val ((n,v):rest)
+  | name == n = (name, val) : rest
+  | otherwise = (n, v) : env_update name val rest
+
+env_lookup :: String -> Env -> Value
+env_lookup name []           = error ("variável não encontrada: " ++ name)
+env_lookup name ((n,v):rest)
+  | name == n = v
+  | otherwise = env_lookup name rest
+
+-- ─────────────────────────────────────────────────────────────────────────────
+
+getId :: Token -> String
+getId (Token _ (Id s)) = s
+getId t                = error ("esperado Id, obteve: " ++ show t)
+
+defaultValue :: Token -> Value
+defaultValue (Token _ TInt)    = VFloat 0.0
+defaultValue (Token _ TFloat)  = VFloat 0.0
+defaultValue (Token _ TBool)   = VFloat 0.0
+defaultValue (Token _ TString) = VString ""
+defaultValue t                 = error ("tipo desconhecido: " ++ show t)
+
+-- ──────────────────────────────── Gramática ─────────────────────────────────────
+
+program :: ParsecT [Token] Env IO ()
 program = do
-            a <- programToken 
-            b <- idToken 
-            c <- varToken
-            d <- varDecl
-            e <- beginToken 
-            f <- stmts
-            g <- endToken
-            eof
-            return (a:b:[c] ++ d++ [e] ++ f ++ [g])
+  funToken
+  name <- idToken
+  lpToken
+  rpToken
+  lcbToken
+  stmts
+  rcbToken
+  eof
 
-varDecl :: ParsecT [Token] [(Token,Token)] IO([Token])
-varDecl = do
-            a <- idToken
-            b <- colonToken
-            c <- typeToken
-            updateState(symtable_insert (a, get_default_value c))
-            s <- getState
-            liftIO (print s)
-            return (a:b:[c])
+stmts :: ParsecT [Token] Env IO ()
+stmts = (do { stmt; stmts }) <|> return ()
 
-stmts :: ParsecT [Token] [(Token,Token)] IO([Token])
-stmts = do
-          first <- assign
-          next <- remaining_stmts
-          return (first ++ next)
+stmt :: ParsecT [Token] Env IO ()
+stmt = try printStmt <|> declAssignStmt
 
-remaining_stmts :: ParsecT [Token] [(Token,Token)] IO([Token])
-remaining_stmts = (do a <- semiColonToken
-                      b <- assign
-                      return (a:b)) <|> (return [])
+-- print ( expr ) ;
+printStmt :: ParsecT [Token] Env IO ()
+printStmt = do
+  printToken
+  lpToken
+  val <- expr
+  rpToken
+  semicolonToken
+  liftIO $ putStrLn $ showValue val
 
-assign :: ParsecT [Token] [(Token,Token)] IO([Token])
-assign = do
-          a <- idToken
-          b <- assignToken
-          c <- expression
-          s <- getState
-          if (not (compatible (get_type a s) c)) then fail "type mismatch"
-          else 
-            do 
-              updateState(symtable_update (a, c))
-              s <- getState
-              liftIO (print s)
-              return (a:b:[c])
+-- id : type = expr ;
+declAssignStmt :: ParsecT [Token] Env IO ()
+declAssignStmt = do
+  nameToken <- idToken
+  colonToken
+  tyToken   <- typeToken
+  assignToken
+  val       <- expr
+  semicolonToken
+  let name = getId nameToken
+  env <- getState
+  let typedVal = coerce tyToken val
+  if name `elem` map fst env
+    then updateState (env_update name typedVal)
+    else updateState (env_insert name typedVal)
+  newEnv <- getState
+  liftIO $ print newEnv
 
--- funções para verificação de tipos
+-- Coerce converte um VFloat para o tipo declarado (int trunca, float mantém)
+coerce :: Token -> Value -> Value
+coerce (Token _ TInt)   (VFloat d) = VFloat (fromIntegral (truncate d :: Int))
+coerce (Token _ TFloat) v          = v
+coerce _ v                         = v
 
-get_default_value :: Token -> Token
-get_default_value (Token p (Type "int")) = Token p (Int 0)
-get_default_value (Token p (Type "bool")) = Token p (Bool False)
+-- ─────────────────────────────────────────────────────────────────────────────
 
-get_type :: Token -> [(Token, Token)] -> Token
-get_type _ [] = error "variable not found"
-get_type token@(Token _ (Id id1)) ((Token _ (Id id2), value):t) = 
-         if id1 == id2 then value
-         else get_type token t
+expr :: ParsecT [Token] Env IO Value
+expr = do
+  t <- term
+  exprRest t
 
-compatible :: Token -> Token -> Bool
-compatible (Token _ (Int _)) (Token _ (Int _)) = True
-compatible (Token _ (Bool _)) (Token _ (Bool _)) = True
-compatible _ _ = False
+exprRest :: Value -> ParsecT [Token] Env IO Value
+exprRest acc =
+  (do addToken; t <- term; exprRest (numOp (+) acc t))
+  <|>
+  (do subToken; t <- term; exprRest (numOp (-) acc t))
+  <|>
+  return acc
 
--- funções para o avaliador de expressões
+term :: ParsecT [Token] Env IO Value
+term = do
+  f <- factor
+  termRest f
 
-expression :: ParsecT [Token] [(Token,Token)] IO(Token)
-expression = try bin_expression <|> una_expression
+termRest :: Value -> ParsecT [Token] Env IO Value
+termRest acc =
+  (do multToken; f <- factor; termRest (numOp (*) acc f))
+  <|>
+  (do divToken;  f <- factor; termRest (numOp (/) acc f))
+  <|>
+  return acc
 
-una_expression :: ParsecT [Token] [(Token,Token)] IO(Token)
-una_expression = do
-                   op <- addToken
-                   a <- intToken 
-                   return (a)
-                 <|> 
-                 do 
-                   a <- boolToken
-                   return (a)
+factor :: ParsecT [Token] Env IO Value
+factor =
+  -- ( expr )
+  (do lpToken; v <- expr; rpToken; return v)
+  <|>
+  -- literal float
+  (do Token _ (FloatLit d) <- floatLitToken; return (VFloat d))
+  <|>
+  -- literal int
+  (do Token _ (IntLit i)   <- intLitToken;   return (VFloat (fromIntegral i)))
+  <|>
+  -- variável
+  (do nameToken <- idToken
+      env <- getState
+      return (env_lookup (getId nameToken) env))
 
---- funções considerando associatividade à esquerda                  
-bin_expression :: ParsecT [Token] [(Token,Token)] IO(Token)
-bin_expression = do
-                   n1 <- intToken
-                   result <- eval_remaining n1
-                   return (result)
+numOp :: (Double -> Double -> Double) -> Value -> Value -> Value
+numOp op (VFloat a) (VFloat b) = VFloat (op a b)
+numOp _ _ _                    = error "operação aritmética com tipo inválido"
 
-eval_remaining :: Token -> ParsecT [Token] [(Token,Token)] IO(Token)
-eval_remaining n1 = do
-                      op <- addToken
-                      n2 <- intToken
-                      result <- eval_remaining (eval n1 op n2)
-                      return (result) 
-                    <|> return (n1)                              
+-- Exibe um Value de forma legível
+showValue :: Value -> String
+showValue (VFloat d)
+  | d == fromIntegral (round d :: Int) = show (round d :: Int)
+  | otherwise                          = show d
+showValue (VString s) = s
 
-eval :: Token -> Token -> Token -> Token
-eval (Token p1 (Int x)) (Token _ Add) (Token _ (Int y)) = 
-      (Token p1 (Int (x + y)))
+-- ─────────────────────────────────────────────────────────────────────────────
 
--- funções para a tabela de símbolos
+getTokens :: String -> IO [Token]
+getTokens fn = do
+  contents <- readFile fn
+  return (alexScanTokens contents)
 
-symtable_insert :: (Token,Token) -> [(Token,Token)] -> [(Token,Token)]
-symtable_insert symbol []  = [symbol]
-symtable_insert symbol symtable = symtable ++ [symbol]
-
-symtable_update :: (Token,Token) -> [(Token,Token)] -> [(Token,Token)]
-symtable_update _ [] = fail "variable not found"
-symtable_update (token1@(Token p1 c1), v1) ((token2@(Token p2 c2), v2):t) = 
-                               if c1 == c2 then (token1, v1) : t
-                               else (token2, v2) : symtable_update (token1, v1) t
-
-symtable_remove :: (Token,Token) -> [(Token,Token)] -> [(Token,Token)]
-symtable_remove _ [] = fail "variable not found"
-symtable_remove (token1@(Token p1 c1), v1) ((token2@(Token p2 c2), v2):t) = 
-                               if c1 == c2 then t
-                               else (token2, v2) : symtable_remove (token1, v1) t                               
-
-
--- invocação do parser para o símbolo de partida 
-
-parser :: [Token] -> IO (Either ParseError [Token])
-parser tokens = runParserT program [] "Error message" tokens
+parser :: [Token] -> IO (Either ParseError ())
+parser tokens = runParserT program [] "erro" tokens
 
 main :: IO ()
 main = do
-        args <- getArgs
-        case args of 
-          [fn] -> do
-            tokens <- getTokens fn
-            result <- parser tokens
-            case result of
-            { Left err -> print err; 
-              Right ans -> print ans
-            }
-          _ -> putStrLn "Please inform the input filename. Closing application..."
+  contents <- getContents
+  let tokens = alexScanTokens contents
+  result <- parser tokens
+  case result of
+    Left err -> print err
+    Right () -> return ()
