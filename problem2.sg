@@ -1,4 +1,4 @@
-fun main() {
+fun main(): none {
     intervalo1: int = 0; // [0, 25]
     intervalo2: int = 0; // [26, 50]
     intervalo3: int = 0; // [51, 75]

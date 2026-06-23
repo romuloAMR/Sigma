@@ -1,4 +1,4 @@
-fun main() {
+fun main(): none {
     linhasA: int = int(read());
     colunasA: int = int(read());
 
@@ -51,3 +51,4 @@ fun main() {
         print("Nao eh possivel multiplicar as matrizes: colunas de A diferente de linhas de B.");
     }
 }
+
