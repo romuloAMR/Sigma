@@ -94,7 +94,7 @@ nextToken = tokenPrim show update_pos Just
 
 -- ─────────────────────────────────────────────────────────────────────────────
 
-data Value = VFloat Double | VString String
+data Value = VInt Int | VFloat Double | VString String
   deriving (Show, Eq)
 
 type Env = [(String, Value)]
@@ -121,19 +121,31 @@ getId (Token _ (Id s)) = s
 getId t                = error ("esperado Id, obteve: " ++ show t)
 
 coerce :: Token -> Value -> Value
-coerce (Token _ TInt)   (VFloat d) = VFloat (fromIntegral (truncate d :: Int))
+coerce (Token _ TInt)   (VFloat d) = VInt (truncate d)
+coerce (Token _ TInt)   (VInt i)   = VInt i
+coerce (Token _ TFloat) (VInt i)   = VFloat (fromIntegral i)
 coerce (Token _ TFloat) v          = v
 coerce _ v                         = v
 
 toInt :: Value -> Value
-toInt (VFloat d) = VFloat (fromIntegral (truncate d :: Int))
+toInt (VFloat d) = VInt (truncate d)
+toInt (VInt i)   = VInt i
 toInt v          = v
 
 numOp :: (Double -> Double -> Double) -> Value -> Value -> Value
+numOp op (VInt a)   (VInt b)   = let res = op (fromIntegral a) (fromIntegral b)
+                                 in if res == fromIntegral (truncate res :: Int)
+                                    then VInt (truncate res)
+                                    else VFloat res
 numOp op (VFloat a) (VFloat b) = VFloat (op a b)
+numOp op (VInt a)   (VFloat b) = VFloat (op (fromIntegral a) b)
+numOp op (VFloat a) (VInt b)   = VFloat (op a (fromIntegral b))
 numOp _ _ _                    = error "Invalid data type in mathematical operation"
 
 evalRelop :: Token -> Value -> Value -> Bool
+evalRelop op (VInt a) (VInt b)     = evalRelop op (VFloat (fromIntegral a)) (VFloat (fromIntegral b))
+evalRelop op (VInt a) (VFloat b)   = evalRelop op (VFloat (fromIntegral a)) (VFloat b)
+evalRelop op (VFloat a) (VInt b)   = evalRelop op (VFloat a) (VFloat (fromIntegral b))
 evalRelop (Token _ Ge)  (VFloat a) (VFloat b) = a >= b
 evalRelop (Token _ Le)  (VFloat a) (VFloat b) = a <= b
 evalRelop (Token _ Gt)  (VFloat a) (VFloat b) = a > b
@@ -143,6 +155,7 @@ evalRelop (Token _ NEq) (VFloat a) (VFloat b) = a /= b
 evalRelop _ _ _ = error "Relational operator with invalid type"
 
 showValue :: Value -> String
+showValue (VInt i)   = show i
 showValue (VFloat d)
   | d == fromIntegral (round d :: Int) = show (round d :: Int)
   | otherwise                          = show d
@@ -282,8 +295,15 @@ incrementStmt = do
   _ <- semicolonToken
   let name = getId nameToken
   env <- getState
-  let VFloat v = env_lookup name env
-  updateState (env_update name (VFloat (v + 1)))
+  
+  let val = env_lookup name env
+  
+  let newVal = case val of
+                 VInt i   -> VInt (i + 1)
+                 VFloat v -> VFloat (v + 1)
+                 _        -> error ("Não é possível incrementar o tipo: " ++ name)
+                 
+  updateState (env_update name newVal)
   newEnv <- getState
   liftIO $ print newEnv
 
@@ -383,6 +403,8 @@ factor =
   (do nameToken <- idToken
       env <- getState
       return (env_lookup (getId nameToken) env))
+  <|>
+  (do Token _ (IntLit i) <- intLitToken; return (VInt i))
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- entry
