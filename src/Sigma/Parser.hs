@@ -103,6 +103,12 @@ nextToken = tokenPrim show update_pos Just
 
 -- ─────────────────────────────────────────────────────────────────────────────
 
+debug :: Bool
+debug = True
+
+debugEnv :: Env -> IO ()
+debugEnv env = if debug then print env else return ()
+
 data Value = VInt Int | VFloat Double | VString String
   deriving (Show, Eq)
 
@@ -213,17 +219,44 @@ runWithRef envRef toks p = do
 -- ─────────────────────────────────────────────────────────────────────────────
 -- gramatics
 
-program :: IORef Env -> ParsecT [Token] Env IO ()
-program envRef = do
+commaToken :: ParsecT [Token] Env IO Token
+commaToken = mkTok Comma
+
+-- parse one param group: name1, name2, ..., nameN : type
+-- e.g.  a, b, c: int   or just   x: float
+paramGroup :: ParsecT [Token] Env IO ()
+paramGroup = do
+  _ <- idToken
+  _ <- many (try (do { _ <- commaToken; idToken }))
+  _ <- colonToken
+  _ <- returnTypeToken
+  return ()
+
+-- params := ε | paramGroup (, paramGroup)*
+params :: ParsecT [Token] Env IO ()
+params =
+  (do paramGroup
+      _ <- many (try (do { _ <- commaToken; paramGroup }))
+      return ())
+  <|> return ()
+
+funDecl :: IORef Env -> ParsecT [Token] Env IO ()
+funDecl envRef = do
   _ <- funToken
   _ <- idToken
   _ <- lpToken
+  params
   _ <- rpToken
   _ <- colonToken
   _ <- returnTypeToken
   _ <- lcbToken
   stmts envRef
   _ <- rcbToken
+  return ()
+
+program :: IORef Env -> ParsecT [Token] Env IO ()
+program envRef = do
+  _ <- many1 (funDecl envRef)
   eof
 
 stmts :: IORef Env -> ParsecT [Token] Env IO ()
@@ -316,7 +349,7 @@ incrementStmt = do
                  
   updateState (env_update name newVal)
   newEnv <- getState
-  liftIO $ print newEnv
+  liftIO $ debugEnv newEnv
 
 -- id = expr ;
 assignStmt :: ParsecT [Token] Env IO ()
@@ -330,7 +363,7 @@ assignStmt = do
   let _ = env_lookup name env
   updateState (env_update name val)
   newEnv <- getState
-  liftIO $ print newEnv
+  liftIO $ debugEnv newEnv
 
 -- id : type = expr ;
 declAssignStmt :: ParsecT [Token] Env IO ()
@@ -348,7 +381,7 @@ declAssignStmt = do
     then updateState (env_update name typedVal)
     else updateState (env_insert name typedVal)
   newEnv <- getState
-  liftIO $ print newEnv
+  liftIO $ debugEnv newEnv
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- boolean conditions
@@ -420,6 +453,15 @@ factor =
 -- ─────────────────────────────────────────────────────────────────────────────
 -- entry
 
+showError :: String -> ParseError -> String
+showError src err =
+  let pos    = errorPos err
+      ln     = sourceLine pos
+      col    = sourceColumn pos
+      srcLine = lines src !! (ln - 1)
+      caret  = replicate (col - 1) ' ' ++ "^"
+  in show err ++ "\n" ++ srcLine ++ "\n" ++ caret
+
 main :: IO ()
 main = do
   args <- getArgs
@@ -429,7 +471,7 @@ main = do
   contents <- readFile fn
   let toks = alexScanTokens contents
   envRef <- newIORef []
-  result <- runParserT (program envRef) [] "erro" toks
+  result <- runParserT (program envRef) [] fn toks
   case result of
-    Left err -> print err
+    Left err -> putStrLn (showError contents err)
     Right () -> return ()
