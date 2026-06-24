@@ -79,6 +79,15 @@ typeToken = tokenPrim show update_pos get_tok where
   get_tok tok@(Token _ TString) = Just tok
   get_tok _                     = Nothing
 
+returnTypeToken :: ParsecT [Token] Env IO Token
+returnTypeToken = tokenPrim show update_pos get_tok where
+  get_tok tok@(Token _ TInt)    = Just tok
+  get_tok tok@(Token _ TFloat)  = Just tok
+  get_tok tok@(Token _ TBool)   = Just tok
+  get_tok tok@(Token _ TString) = Just tok
+  get_tok tok@(Token _ TNone)   = Just tok
+  get_tok _                     = Nothing
+
 relopToken :: ParsecT [Token] Env IO Token
 relopToken = tokenPrim show update_pos get_tok where
   get_tok tok@(Token _ Ge)  = Just tok
@@ -210,6 +219,8 @@ program envRef = do
   _ <- idToken
   _ <- lpToken
   _ <- rpToken
+  _ <- colonToken
+  _ <- returnTypeToken
   _ <- lcbToken
   stmts envRef
   _ <- rcbToken
