@@ -368,6 +368,7 @@ assignStmt = do
 -- id : type = expr ;
 declAssignStmt :: ParsecT [Token] Env IO ()
 declAssignStmt = do
+  pos <- getPosition
   nameToken <- idToken
   _ <- colonToken
   tyToken   <- typeToken
@@ -378,7 +379,9 @@ declAssignStmt = do
   let typedVal = coerce tyToken val
   env <- getState
   if name `elem` map fst env
-    then updateState (env_update name typedVal)
+    then do
+      setPosition pos
+      fail ("Semantic error: variable '" ++ name ++ "' is declared in scope")
     else updateState (env_insert name typedVal)
   newEnv <- getState
   liftIO $ debugEnv newEnv
