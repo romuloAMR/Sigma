@@ -12,7 +12,8 @@
         "haskell.plugin.ghcide.completions.config.snippetsOn": true
       },
       "extensions": [
-        "haskell.haskell"
+        "haskell.haskell",
+        "haskell.language-haskell"
       ]
     }
   },

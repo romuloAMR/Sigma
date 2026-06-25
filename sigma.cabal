@@ -35,20 +35,29 @@ common warnings
     ghc-options: -Wall
 
 library
-    exposed-modules:  Sigma.Lexer
+    exposed-modules:  
+        Sigma.Lexer
+        Sigma.Types
+        Sigma.Environment
+        Sigma.Parser
+        Sigma.Parser.Core
+        Sigma.Parser.Expression
+        Sigma.Parser.Statement
     hs-source-dirs:   src
     build-depends:
         base ^>=4.22.0.0,
-        array
+        array,
+        parsec,
+        mtl
     build-tool-depends: alex:alex
     default-language: Haskell2010
 
 executable sigma
     import:           warnings
-    main-is:          Parser.hs
+    main-is:          Main.hs
+    hs-source-dirs:   app
     build-depends:
         base ^>=4.22.0.0,
         sigma,
         parsec
-    hs-source-dirs:   src/Sigma
     default-language: Haskell2010
