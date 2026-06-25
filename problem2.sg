@@ -1,0 +1,30 @@
+fun main(): none {
+    intervalo1: int = 0; // [0, 25]
+    intervalo2: int = 0; // [26, 50]
+    intervalo3: int = 0; // [51, 75]
+    intervalo4: int = 0; // [76, 100]
+
+    numero: int = int(read());
+
+    while (numero >= 0) {
+        if (numero >= 0 and numero <= 25) {
+            intervalo1++;
+        }
+        if (numero >= 26 and numero <= 50) {
+            intervalo2++;
+        }
+        if (numero >= 51 and numero <= 75) {
+            intervalo3++;
+        }
+        if (numero >= 76 and numero <= 100) {
+            intervalo4++;
+        }
+
+        numero = read();
+    }
+
+    print(intervalo1);
+    print(intervalo2);
+    print(intervalo3);
+    print(intervalo4);
+}

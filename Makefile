@@ -29,3 +29,18 @@ play: ## Open the interactive shell (REPL) with project context
 clean: ## Remove build artifacts
 	@echo "Cleaning build directories..."
 	$(CABAL) clean
+
+test: ## Merge Sort Test
+	cabal run sigma < test.sg
+
+problem-1: ## Run Problem 1
+	cabal run sigma -- problem1.sg
+
+problem-2: ## Run Problem 2
+	cabal run sigma -- problem2.sg
+
+problem-3: ## Run Problem 3
+	cabal run sigma -- problem3.sg
+
+error-1: ## Run Error 1
+	cabal run sigma -- error1.sg=
