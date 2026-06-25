@@ -148,7 +148,7 @@ assignStmt = do
   newEnv <- getState
   liftIO $ debugEnv newEnv
 
-declAssignStmt :: SigmaParser ()
+declAssignStmt :: ParsecT [Token] Env IO ()
 declAssignStmt = do
   pos <- getPosition
   nameToken <- idToken
@@ -160,10 +160,25 @@ declAssignStmt = do
   let name     = getId nameToken
   let typedVal = coerce tyToken val
   env <- getState
-  if name `elem` map fst env
+
+  let typeMatch = case (tyToken, typedVal) of
+                    (Token _ TInt,    VInt _)    -> True
+                    (Token _ TFloat,  VFloat _)  -> True
+                    (Token _ TString, VString _) -> True
+                    (Token _ TBool,   VBool _)   -> True 
+                    _                            -> False
+
+  if not typeMatch
     then do
       setPosition pos
-      fail ("Semantic error: variable '" ++ name ++ "' is declared in scope")
-    else updateState (env_insert name typedVal)
-  newEnv <- getState
-  liftIO $ debugEnv newEnv
+      fail ("Type error: Type mismatch. Variable '" ++ name ++ "' cannot hold this type of value.")
+    else
+      if name `elem` map fst env
+        then do
+          setPosition pos
+          fail ("Semantic error: variable '" ++ name ++ "' is declared in scope")
+        else do
+          updateState (env_insert name typedVal)
+          newEnv <- getState
+          liftIO $ debugEnv newEnv
+

@@ -23,7 +23,6 @@ getId (Token _ (Id s)) = s
 getId t                = error ("esperado Id, obteve: " ++ show t)
 
 coerce :: Token -> Value -> Value
-coerce (Token _ TInt)   (VFloat d) = VInt (truncate d)
 coerce (Token _ TInt)   (VInt i)   = VInt i
 coerce (Token _ TFloat) (VInt i)   = VFloat (fromIntegral i)
 coerce (Token _ TFloat) v          = v

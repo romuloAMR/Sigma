@@ -35,6 +35,7 @@ showValue (VFloat d)
   | d == fromIntegral (round d :: Int) = show (round d :: Int)
   | otherwise                          = show d
 showValue (VString s) = s
+showValue (VBool b)  = if b then "true" else "false"
 
 cond :: SigmaParser Bool
 cond = do { t <- boolTerm; condRest t }
@@ -77,9 +78,13 @@ termRest acc =
   <|> (do _ <- divToken; f <- factor; termRest (numOp (/) acc f))
   <|> return acc
 
-factor :: SigmaParser Value
+factor :: ParsecT [Token] Env IO Value
 factor =
-  (do _ <- tintToken; _ <- lpToken; v <- expr; _ <- rpToken; return (toInt v))
+  (do tyTok <- typeToken   
+      _     <- lpToken     
+      v     <- expr        
+      _     <- rpToken     
+      return (explicitCast tyTok v))
   <|>
   (do _ <- readToken; _ <- lpToken; _ <- rpToken
       line <- liftIO getLine
@@ -89,8 +94,19 @@ factor =
   <|>
   (do Token _ (FloatLit d) <- floatLitToken; return (VFloat d))
   <|>
+  (do Token _ (IntLit i) <- intLitToken; return (VInt i))
+  <|>
   (do nameToken <- idToken
       env <- getState
       return (env_lookup (getId nameToken) env))
   <|>
-  (do Token _ (IntLit i) <- intLitToken; return (VInt i))
+  (do Token _ (BoolLit b) <- boolLitToken; return (VBool b))
+
+explicitCast :: Token -> Value -> Value
+explicitCast (Token _ TInt)    v            = toInt v
+explicitCast (Token _ TFloat)  (VInt i)     = VFloat (fromIntegral i)
+explicitCast (Token _ TFloat)  (VFloat d)   = VFloat d
+explicitCast (Token _ TString) v            = VString (showValue v)
+explicitCast (Token _ TBool)   (VBool b)    = VBool b
+explicitCast (Token _ TBool)   (VInt i)     = VBool (i /= 0)
+explicitCast _ v                            = v

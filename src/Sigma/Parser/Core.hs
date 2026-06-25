@@ -49,6 +49,11 @@ floatLitToken = tokenPrim show update_pos get_tok where
   get_tok tok@(Token _ (FloatLit _)) = Just tok
   get_tok _                          = Nothing
 
+boolLitToken :: ParsecT [Token] Env IO Token
+boolLitToken = tokenPrim show update_pos get_tok where
+  get_tok tok@(Token _ (BoolLit _)) = Just tok
+  get_tok _                         = Nothing
+
 typeToken = tokenPrim show update_pos get_tok where
   get_tok tok@(Token _ TInt)    = Just tok
   get_tok tok@(Token _ TFloat)  = Just tok
