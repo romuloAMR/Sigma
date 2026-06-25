@@ -13,7 +13,7 @@ mkTok :: TokenClass -> SigmaParser Token
 mkTok tc = tokenPrim show update_pos get_tok where
   get_tok tok@(Token _ c) = if c == tc then Just tok else Nothing
 
-funToken, lpToken, rpToken, lcbToken, rcbToken, semicolonToken, colonToken, assignToken, printToken, readToken, whileToken, ifToken, andToken, orToken, incToken, tintToken, addToken, subToken, multToken, divToken, commaToken :: SigmaParser Token
+funToken, lpToken, rpToken, lcbToken, rcbToken, semicolonToken, colonToken, assignToken, printToken, readToken, whileToken, ifToken, forToken, andToken, orToken, incToken, tintToken, addToken, subToken, multToken, divToken, commaToken :: SigmaParser Token
 funToken       = mkTok Fun
 lpToken        = mkTok LP
 rpToken        = mkTok RP
@@ -26,6 +26,7 @@ printToken     = mkTok Print
 readToken      = mkTok Read
 whileToken     = mkTok While
 ifToken        = mkTok If
+forToken       = mkTok For
 andToken       = mkTok And
 orToken        = mkTok Or
 incToken       = mkTok Inc
@@ -97,6 +98,15 @@ collectBlock = go 0
           | depth == 0 -> return []
           | otherwise  -> do rest <- go (depth - 1); return (tok : rest)
         _ -> do rest <- go depth; return (tok : rest)
+
+collectUntilSemicolon :: SigmaParser [Token]
+collectUntilSemicolon = do
+  inp <- getInput
+  case inp of
+    [] -> return []
+    (tok:_) -> case tok of
+      Token _ Semicolon -> return []
+      _ -> do _ <- nextToken; rest <- collectUntilSemicolon; return (tok:rest)
 
 collectUntilRP :: SigmaParser [Token]
 collectUntilRP = go 0
