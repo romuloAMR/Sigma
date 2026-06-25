@@ -32,3 +32,13 @@ toInt :: Value -> Value
 toInt (VFloat d) = VInt (truncate d)
 toInt (VInt i)   = VInt i
 toInt v          = v
+
+indexedUpdate :: Value -> [Int] -> Value -> Value
+indexedUpdate _ [] newVal = newVal
+indexedUpdate (VArray vs) (i:rest) newVal =
+  VArray (take i vs ++ [indexedUpdate (vs !! i) rest newVal] ++ drop (i+1) vs)
+indexedUpdate (VMatrix vs) (i:rest) newVal =
+  let row = VArray (vs !! i)
+      VArray newRow = indexedUpdate row rest newVal
+  in VMatrix (take i vs ++ [newRow] ++ drop (i+1) vs)
+indexedUpdate _ _ _ = error "value is not indexable"

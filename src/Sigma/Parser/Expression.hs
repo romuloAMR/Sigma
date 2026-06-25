@@ -2,6 +2,7 @@ module Sigma.Parser.Expression (expr, cond, numOp, evalRelop, showValue) where
 
 import Text.Parsec
 import Control.Monad.IO.Class (liftIO)
+import Data.List (intercalate)
 import Sigma.Types
 import Sigma.Lexer
 import Sigma.Parser.Core
@@ -35,7 +36,10 @@ showValue (VFloat d)
   | d == fromIntegral (round d :: Int) = show (round d :: Int)
   | otherwise                          = show d
 showValue (VString s) = s
-showValue (VBool b)  = if b then "true" else "false"
+showValue (VBool b)   = if b then "true" else "false"
+showValue (VArray vs)  = "[" ++ intercalate ", " (map showValue vs) ++ "]"
+showValue (VMatrix vs) = intercalate "\n" (map showRow vs)
+  where showRow row = "[" ++ intercalate ", " (map showValue row) ++ "]"
 
 cond :: SigmaParser Bool
 cond = do { t <- boolTerm; condRest t }
@@ -78,7 +82,23 @@ termRest acc =
   <|> (do _ <- divToken; f <- factor; termRest (numOp (/) acc f))
   <|> return acc
 
-factor :: ParsecT [Token] Env IO Value
+toIndex :: Value -> Int
+toIndex (VInt i)   = i
+toIndex (VFloat d) = truncate d
+toIndex _          = error "index must be an integer"
+
+applyIndices :: Value -> [Value] -> Value
+applyIndices v [] = v
+applyIndices (VArray vs)  (i:rest) = applyIndices (vs !! toIndex i) rest
+applyIndices (VMatrix vs) (i:rest) = applyIndices (VArray (vs !! toIndex i)) rest
+applyIndices _ _ = error "value is not indexable"
+
+matrizBuiltin :: Token -> Maybe Token
+matrizBuiltin tok@(Token _ (Id s))
+  | s `elem` ["matrizFloat", "matrizInt", "matrizBool", "matrizString"] = Just tok
+matrizBuiltin _ = Nothing
+
+factor :: SigmaParser Value
 factor =
   (do tyTok <- typeToken   
       _     <- lpToken     
@@ -96,9 +116,23 @@ factor =
   <|>
   (do Token _ (IntLit i) <- intLitToken; return (VInt i))
   <|>
+  (do tok <- tokenPrim show update_pos matrizBuiltin
+      _ <- lpToken; rows <- expr; _ <- commaToken; cols <- expr; _ <- rpToken
+      let r = case rows of { VInt n -> n; VFloat n -> truncate n; _ -> error "matriz: rows must be int" }
+      let c = case cols of { VInt n -> n; VFloat n -> truncate n; _ -> error "matriz: cols must be int" }
+      let def = case tok of
+                  Token _ (Id "matrizFloat")  -> VFloat 0.0
+                  Token _ (Id "matrizInt")    -> VInt 0
+                  Token _ (Id "matrizBool")   -> VBool False
+                  Token _ (Id "matrizString") -> VString ""
+                  _                           -> VFloat 0.0
+      return (VMatrix (replicate r (replicate c def))))
+  <|>
   (do nameToken <- idToken
       env <- getState
-      return (env_lookup (getId nameToken) env))
+      let base = env_lookup (getId nameToken) env
+      idxs <- many (do { _ <- mkTok LB; i <- expr; _ <- mkTok RB; return i })
+      return (applyIndices base idxs))
   <|>
   (do Token _ (BoolLit b) <- boolLitToken; return (VBool b))
 

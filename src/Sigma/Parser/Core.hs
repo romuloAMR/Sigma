@@ -80,6 +80,12 @@ relopToken = tokenPrim show update_pos get_tok where
 
 nextToken = tokenPrim show update_pos Just
 
+typeAnnotation :: SigmaParser (Token, Int)
+typeAnnotation = do
+  ty   <- typeToken
+  dims <- many (try (do { _ <- mkTok LB; _ <- mkTok RB; return () }))
+  return (ty, length dims)
+
 collectBlock :: SigmaParser [Token]
 collectBlock = go 0
   where

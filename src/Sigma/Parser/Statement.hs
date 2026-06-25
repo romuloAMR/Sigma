@@ -64,6 +64,7 @@ stmt envRef
    <|> try (whileStmt envRef)
    <|> try (ifStmt envRef)
    <|> try incrementStmt
+   <|> try indexAssignStmt
    <|> try assignStmt
    <|> declAssignStmt
 
@@ -135,6 +136,23 @@ incrementStmt = do
   newEnv <- getState
   liftIO $ debugEnv newEnv
 
+-- id[expr]...[expr] = expr ;
+indexAssignStmt :: SigmaParser ()
+indexAssignStmt = do
+  nameToken <- idToken
+  idxs <- many1 (do { _ <- mkTok LB; i <- expr; _ <- mkTok RB; return i })
+  _ <- assignToken
+  val <- expr
+  _ <- semicolonToken
+  let name = getId nameToken
+  env <- getState
+  let base = env_lookup name env
+  let idxInts = map (\i -> case i of { VInt n -> n; VFloat n -> truncate n; _ -> error "index must be int" }) idxs
+  let newBase = indexedUpdate base idxInts val
+  updateState (env_update name newBase)
+  newEnv <- getState
+  liftIO $ debugEnv newEnv
+
 assignStmt :: SigmaParser ()
 assignStmt = do
   nameToken <- idToken
@@ -153,19 +171,26 @@ declAssignStmt = do
   pos <- getPosition
   nameToken <- idToken
   _ <- colonToken
-  tyToken   <- typeToken
+  (tyToken, dims) <- typeAnnotation
   _ <- assignToken
   val       <- expr
   _ <- semicolonToken
   let name     = getId nameToken
-  let typedVal = coerce tyToken val
+  let typedVal = case dims of
+                   0 -> coerce tyToken val
+                   1 -> case val of { VArray _  -> val; _ -> error "expected array initializer" }
+                   _ -> case val of { VMatrix _ -> val; _ -> error "expected matrix initializer" }
   env <- getState
 
   let typeMatch = case (tyToken, typedVal) of
                     (Token _ TInt,    VInt _)    -> True
                     (Token _ TFloat,  VFloat _)  -> True
                     (Token _ TString, VString _) -> True
-                    (Token _ TBool,   VBool _)   -> True 
+                    (Token _ TBool,   VBool _)   -> True
+                    (Token _ TInt,    VArray _)  -> True
+                    (Token _ TFloat,  VArray _)  -> True
+                    (Token _ TInt,    VMatrix _) -> True
+                    (Token _ TFloat,  VMatrix _) -> True
                     _                            -> False
 
   if not typeMatch
