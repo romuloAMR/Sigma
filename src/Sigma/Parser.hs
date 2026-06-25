@@ -71,6 +71,11 @@ floatLitToken = tokenPrim show update_pos get_tok where
   get_tok tok@(Token _ (FloatLit _)) = Just tok
   get_tok _                          = Nothing
 
+boolLitToken :: ParsecT [Token] Env IO Token
+boolLitToken = tokenPrim show update_pos get_tok where
+  get_tok tok@(Token _ (BoolLit _)) = Just tok
+  get_tok _                         = Nothing
+
 typeToken :: ParsecT [Token] Env IO Token
 typeToken = tokenPrim show update_pos get_tok where
   get_tok tok@(Token _ TInt)    = Just tok
@@ -109,7 +114,7 @@ debug = True
 debugEnv :: Env -> IO ()
 debugEnv env = if debug then print env else return ()
 
-data Value = VInt Int | VFloat Double | VString String
+data Value = VInt Int | VFloat Double | VString String | VBool Bool
   deriving (Show, Eq)
 
 type Env = [(String, Value)]
@@ -136,11 +141,19 @@ getId (Token _ (Id s)) = s
 getId t                = error ("esperado Id, obteve: " ++ show t)
 
 coerce :: Token -> Value -> Value
-coerce (Token _ TInt)   (VFloat d) = VInt (truncate d)
 coerce (Token _ TInt)   (VInt i)   = VInt i
 coerce (Token _ TFloat) (VInt i)   = VFloat (fromIntegral i)
 coerce (Token _ TFloat) v          = v
 coerce _ v                         = v
+
+explicitCast :: Token -> Value -> Value
+explicitCast (Token _ TInt)    v            = toInt v
+explicitCast (Token _ TFloat)  (VInt i)     = VFloat (fromIntegral i)
+explicitCast (Token _ TFloat)  (VFloat d)   = VFloat d
+explicitCast (Token _ TString) v            = VString (showValue v)
+explicitCast (Token _ TBool)   (VBool b)    = VBool b
+explicitCast (Token _ TBool)   (VInt i)     = VBool (i /= 0)
+explicitCast _ v                            = v
 
 toInt :: Value -> Value
 toInt (VFloat d) = VInt (truncate d)
@@ -175,6 +188,7 @@ showValue (VFloat d)
   | d == fromIntegral (round d :: Int) = show (round d :: Int)
   | otherwise                          = show d
 showValue (VString s) = s
+showValue (VBool b)  = if b then "true" else "false"
 
 -- ─────────────────────────────────────────────────────────────────
 -- collect block tokens { ... }, without execute (while and if)
@@ -378,13 +392,27 @@ declAssignStmt = do
   let name     = getId nameToken
   let typedVal = coerce tyToken val
   env <- getState
-  if name `elem` map fst env
+
+  let typeMatch = case (tyToken, typedVal) of
+                    (Token _ TInt,    VInt _)    -> True
+                    (Token _ TFloat,  VFloat _)  -> True
+                    (Token _ TString, VString _) -> True
+                    (Token _ TBool,   VBool _)   -> True 
+                    _                            -> False
+
+  if not typeMatch
     then do
       setPosition pos
-      fail ("Semantic error: variable '" ++ name ++ "' is declared in scope")
-    else updateState (env_insert name typedVal)
-  newEnv <- getState
-  liftIO $ debugEnv newEnv
+      fail ("Type error: Type mismatch. Variable '" ++ name ++ "' cannot hold this type of value.")
+    else
+      if name `elem` map fst env
+        then do
+          setPosition pos
+          fail ("Semantic error: variable '" ++ name ++ "' is declared in scope")
+        else do
+          updateState (env_insert name typedVal)
+          newEnv <- getState
+          liftIO $ debugEnv newEnv
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- boolean conditions
@@ -435,7 +463,11 @@ termRest acc =
 
 factor :: ParsecT [Token] Env IO Value
 factor =
-  (do _ <- tintToken; _ <- lpToken; v <- expr; _ <- rpToken; return (toInt v))
+  (do tyTok <- typeToken   
+      _     <- lpToken     
+      v     <- expr        
+      _     <- rpToken     
+      return (explicitCast tyTok v))
   <|>
   (do _ <- readToken; _ <- lpToken; _ <- rpToken
       line <- liftIO getLine
@@ -445,15 +477,14 @@ factor =
   <|>
   (do Token _ (FloatLit d) <- floatLitToken; return (VFloat d))
   <|>
-  (do Token _ (IntLit i) <- intLitToken; return (VFloat (fromIntegral i)))
+  (do Token _ (IntLit i) <- intLitToken; return (VInt i))
   <|>
   (do nameToken <- idToken
       env <- getState
       return (env_lookup (getId nameToken) env))
   <|>
-  (do Token _ (IntLit i) <- intLitToken; return (VInt i))
+  (do Token _ (BoolLit b) <- boolLitToken; return (VBool b))
 
--- ─────────────────────────────────────────────────────────────────────────────
 -- entry
 
 showError :: String -> ParseError -> String
