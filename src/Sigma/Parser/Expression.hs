@@ -114,6 +114,8 @@ factor =
   <|>
   (do Token _ (FloatLit d) <- floatLitToken; return (VFloat d))
   <|>
+  (do Token _ (StringLit s) <- tokenPrim show update_pos (\t -> case t of { Token _ (StringLit _) -> Just t; _ -> Nothing }); return (VString s))
+  <|>
   (do Token _ (IntLit i) <- intLitToken; return (VInt i))
   <|>
   (do tok <- tokenPrim show update_pos matrizBuiltin
