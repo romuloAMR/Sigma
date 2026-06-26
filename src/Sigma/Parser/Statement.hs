@@ -62,6 +62,7 @@ stmt :: IORef Env -> SigmaParser ()
 stmt envRef
     =  try (printStmt envRef)
    <|> try (whileStmt envRef)
+   <|> try (forStmt envRef)
    <|> try (ifStmt envRef)
    <|> try incrementStmt
    <|> try indexAssignStmt
@@ -94,6 +95,7 @@ whileStmt envRef = do
 whileLoop :: IORef Env -> [Token] -> [Token] -> IO ()
 whileLoop envRef condToks bodyToks = do
   env <- readIORef envRef
+  let outerKeys = map fst env
   condResult <- runParserT (do { c <- cond; return c }) env "cond" condToks
   case condResult of
     Left err -> error (show err)
@@ -102,7 +104,57 @@ whileLoop envRef condToks bodyToks = do
       result <- runWithRef envRef bodyToks (stmts envRef)
       case result of
         Left err -> error (show err)
-        Right () -> whileLoop envRef condToks bodyToks
+        Right () -> do
+          afterBody <- readIORef envRef
+          writeIORef envRef (filter (\(k, _) -> k `elem` outerKeys) afterBody)
+          whileLoop envRef condToks bodyToks
+
+-- for (id : type = expr ; cond ; id++) { stmts }
+forStmt :: IORef Env -> SigmaParser ()
+forStmt envRef = do
+  _ <- forToken
+  _ <- lpToken
+  initToks <- collectUntilSemicolon
+  _ <- semicolonToken
+  condToks <- collectUntilSemicolon
+  _ <- semicolonToken
+  incrToks <- collectUntilRP
+  _ <- rpToken
+  _ <- lcbToken
+  bodyToks <- collectBlock
+  env <- getState
+  liftIO $ writeIORef envRef env
+  let outerKeys = map fst env
+  let synSemi = case initToks of { (Token p _ : _) -> [Token p Semicolon]; [] -> [] }
+  result <- liftIO $ runWithRef envRef (initToks ++ synSemi) declAssignStmt
+  case result of
+    Left err -> fail (show err)
+    Right () -> liftIO $ forLoop envRef condToks incrToks bodyToks
+  finalEnv <- liftIO $ readIORef envRef
+  let cleanEnv = filter (\(k, _) -> k `elem` outerKeys) finalEnv
+  liftIO $ writeIORef envRef cleanEnv
+  putState cleanEnv
+
+forLoop :: IORef Env -> [Token] -> [Token] -> [Token] -> IO ()
+forLoop envRef condToks incrToks bodyToks = do
+  env <- readIORef envRef
+  condResult <- runParserT (do { c <- cond; return c }) env "cond" condToks
+  case condResult of
+    Left err -> error (show err)
+    Right False -> return ()
+    Right True -> do
+      bodyResult <- runWithRef envRef bodyToks (stmts envRef)
+      case bodyResult of
+        Left err -> error (show err)
+        Right () -> do
+          afterBody <- readIORef envRef
+          let outerKeys = map fst env
+          writeIORef envRef (filter (\(k, _) -> k `elem` outerKeys) afterBody)
+          let synSemi = case incrToks of { (Token p _ : _) -> [Token p Semicolon]; [] -> [] }
+          incrResult <- runWithRef envRef (incrToks ++ synSemi) incrementStmt
+          case incrResult of
+            Left err -> error (show err)
+            Right () -> forLoop envRef condToks incrToks bodyToks
 
 ifStmt :: IORef Env -> SigmaParser ()
 ifStmt envRef = do
@@ -111,14 +163,25 @@ ifStmt envRef = do
   c <- cond
   _ <- rpToken
   _ <- lcbToken
+  outerEnv <- getState
+  let outerKeys = map fst outerEnv
+  let cleanup = do
+        env <- getState
+        putState (filter (\(k, _) -> k `elem` outerKeys) env)
+        liftIO . writeIORef envRef =<< getState
   if c
     then do
       stmts envRef
       _ <- rcbToken
+      cleanup
+      _ <- optionMaybe (try (do { _ <- mkTok Else; _ <- lcbToken; toks <- collectBlock; return toks }))
       return ()
     else do
       _ <- collectBlock
-      return ()
+      hasElse <- optionMaybe (try (do { _ <- mkTok Else; _ <- lcbToken; return () }))
+      case hasElse of
+        Nothing -> return ()
+        Just _  -> do { stmts envRef; _ <- rcbToken; cleanup }
 
 incrementStmt :: SigmaParser ()
 incrementStmt = do
