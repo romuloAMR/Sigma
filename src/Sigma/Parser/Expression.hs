@@ -16,7 +16,7 @@ numOp op (VInt a)   (VInt b)   = let res = op (fromIntegral a) (fromIntegral b)
 numOp op (VFloat a) (VFloat b) = VFloat (op a b)
 numOp op (VInt a)   (VFloat b) = VFloat (op (fromIntegral a) b)
 numOp op (VFloat a) (VInt b)   = VFloat (op a (fromIntegral b))
-numOp _ _ _                    = error "Erro de Tipo: Tipo de dado invalido na operacao matematica"
+numOp _ _ _                    = error "Type Error: Invalid data type in the mathematical operation"
 
 evalDiv :: Value -> Value -> Value
 evalDiv (VInt a) (VInt b) = VInt (a `mod` b)
@@ -24,7 +24,12 @@ evalDiv a b               = numOp (/) a b
 
 evalMod :: Value -> Value -> Value
 evalMod (VInt a) (VInt b) = VInt (a `mod` b)
-evalMod _ _ = error "Erro de Tipo: O operador modulo (%) so pode ser usado com numeros inteiros"
+evalMod _ _ = error "Type error: The modulo operator (%) can only be used with integers"
+
+evalUnaryMinus :: Value -> Value
+evalUnaryMinus (VInt i)   = VInt (-i)
+evalUnaryMinus (VFloat d) = VFloat (-d)
+evalUnaryMinus _          = error "Type error: The modulo operator (-) can only be used with numbers"
 
 evalRelop :: Token -> Value -> Value -> Bool
 evalRelop op (VInt a) (VInt b)     = evalRelop op (VFloat (fromIntegral a)) (VFloat (fromIntegral b))
@@ -156,6 +161,10 @@ factor =
   (do _ <- readToken; _ <- lpToken; _ <- rpToken
       line <- liftIO getLine
       return (VFloat (read line)))
+  <|>
+  (do _ <- subToken
+      v <- factor
+      return (evalUnaryMinus v))
   <|>
   (do _ <- lpToken; v <- expr; _ <- rpToken; return v)
   <|>
