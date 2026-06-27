@@ -34,6 +34,12 @@ toInt (VInt i)   = VInt i
 toInt (VString s) = VInt (read s)
 toInt v          = v
 
+toFloat :: Value -> Value
+toFloat (VInt i)    = VFloat (fromIntegral i)
+toFloat (VFloat d)  = VFloat d
+toFloat (VString s) = VFloat (read s)
+toFloat v           = v
+
 indexedUpdate :: Value -> [Int] -> Value -> Value
 indexedUpdate _ [] newVal = newVal
 indexedUpdate (VArray vs) (i:rest) newVal =

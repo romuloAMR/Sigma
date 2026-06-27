@@ -43,10 +43,8 @@ evalRelop (Token _ NEq) (VBool a) (VBool b) = a /= b
 evalRelop _ _ _ = error "Erro de Tipo: Operador relacional usado com tipo invalido"
 
 showValue :: Value -> String
-showValue (VInt i)   = show i
-showValue (VFloat d)
-  | d == fromIntegral (round d :: Int) = show (round d :: Int)
-  | otherwise                          = show d
+showValue (VInt i)    = show i
+showValue (VFloat d)  = show d
 showValue (VString s) = s
 showValue (VBool b)   = if b then "true" else "false"
 showValue (VArray vs)  = "[" ++ intercalate ", " (map showValue vs) ++ "]"
@@ -188,11 +186,9 @@ factor =
   (do Token _ (BoolLit b) <- boolLitToken; return (VBool b))
 
 explicitCast :: Token -> Value -> Value
-explicitCast (Token _ TInt)    v            = toInt v
-explicitCast (Token _ TFloat)  (VInt i)     = VFloat (fromIntegral i)
-explicitCast (Token _ TFloat)  (VFloat d)   = VFloat d
-explicitCast (Token _ TFloat)  (VString s)  = VFloat (read s)
-explicitCast (Token _ TString) v            = VString (showValue v)
-explicitCast (Token _ TBool)   (VBool b)    = VBool b
-explicitCast (Token _ TBool)   (VInt i)     = VBool (i /= 0)
-explicitCast _ v                            = v
+explicitCast (Token _ TInt)    v = toInt v
+explicitCast (Token _ TFloat)  v = toFloat v
+explicitCast (Token _ TString) v         = VString (showValue v)
+explicitCast (Token _ TBool)   (VBool b) = VBool b
+explicitCast (Token _ TBool)   (VInt i)  = VBool (i /= 0)
+explicitCast _ v                         = v
