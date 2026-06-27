@@ -20,7 +20,7 @@ main = do
   args <- getArgs
   fn <- case args of
     [f] -> return f
-    _   -> error "Uso: sigma <arquivo.sg>"
+    _   -> error "Use: sigma <file.sg>"
   contents <- readFile fn
   let toks = alexScanTokens contents
   envRef <- newIORef []

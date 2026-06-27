@@ -194,12 +194,11 @@ incrementStmt = do
   let newVal = case val of
                  VInt i   -> VInt (i + 1)
                  VFloat v -> VFloat (v + 1)
-                 _        -> error ("Não é possível incrementar o tipo: " ++ name)
+                 _        -> error ("It is not possible to increment the type: " ++ name)
   updateState (env_update name newVal)
   newEnv <- getState
   liftIO $ debugEnv newEnv
 
--- id[expr]...[expr] = expr ;
 indexAssignStmt :: SigmaParser ()
 indexAssignStmt = do
   nameToken <- idToken
@@ -224,10 +223,22 @@ assignStmt = do
   _ <- semicolonToken
   let name = getId nameToken
   env <- getState
-  let _ = env_lookup name env
-  updateState (env_update name val)
-  newEnv <- getState
-  liftIO $ debugEnv newEnv
+  let oldVal = env_lookup name env
+  let typeMatch = case (oldVal, val) of
+                    (VInt _, VInt _)       -> True
+                    (VFloat _, VFloat _)   -> True
+                    (VString _, VString _) -> True
+                    (VBool _, VBool _)     -> True
+                    (VArray _, VArray _)   -> True
+                    (VMatrix _, VMatrix _) -> True
+                    _                      -> False
+  
+  if typeMatch then do
+    updateState (env_update name val)
+    newEnv <- getState
+    liftIO $ debugEnv newEnv
+  else
+    fail ("Semantic Error: Incompatible type when assigning to the variable '" ++ name ++ "'")
 
 declAssignStmt :: ParsecT [Token] Env IO ()
 declAssignStmt = do

@@ -20,7 +20,7 @@ env_lookup name ((n,v):rest)
 
 getId :: Token -> String
 getId (Token _ (Id s)) = s
-getId t                = error ("esperado Id, obteve: " ++ show t)
+getId t                = error ("expected Id, obtained: " ++ show t)
 
 coerce :: Token -> Value -> Value
 coerce (Token _ TInt)   (VInt i)   = VInt i
@@ -31,6 +31,7 @@ coerce _ v                         = v
 toInt :: Value -> Value
 toInt (VFloat d) = VInt (truncate d)
 toInt (VInt i)   = VInt i
+toInt (VString s) = VInt (read s)
 toInt v          = v
 
 indexedUpdate :: Value -> [Int] -> Value -> Value

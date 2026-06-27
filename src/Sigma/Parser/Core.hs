@@ -13,7 +13,7 @@ mkTok :: TokenClass -> SigmaParser Token
 mkTok tc = tokenPrim show update_pos get_tok where
   get_tok tok@(Token _ c) = if c == tc then Just tok else Nothing
 
-funToken, lpToken, rpToken, lcbToken, rcbToken, semicolonToken, colonToken, assignToken, printToken, readToken, whileToken, ifToken, forToken, andToken, orToken, incToken, tintToken, addToken, subToken, multToken, divToken, commaToken :: SigmaParser Token
+funToken, lpToken, rpToken, lcbToken, rcbToken, semicolonToken, colonToken, assignToken, printToken, readToken, whileToken, ifToken, forToken, notToken, andToken, orToken, incToken, tintToken, addToken, subToken, multToken, divToken, modToken, commaToken :: SigmaParser Token
 funToken       = mkTok Fun
 lpToken        = mkTok LP
 rpToken        = mkTok RP
@@ -27,6 +27,7 @@ readToken      = mkTok Read
 whileToken     = mkTok While
 ifToken        = mkTok If
 forToken       = mkTok For
+notToken       = mkTok Not
 andToken       = mkTok And
 orToken        = mkTok Or
 incToken       = mkTok Inc
@@ -35,6 +36,7 @@ addToken       = mkTok Add
 subToken       = mkTok Sub
 multToken      = mkTok Mult
 divToken       = mkTok Div
+modToken       = mkTok Mod
 commaToken     = mkTok Comma
 
 idToken, intLitToken, floatLitToken, typeToken, returnTypeToken, relopToken, nextToken :: SigmaParser Token
