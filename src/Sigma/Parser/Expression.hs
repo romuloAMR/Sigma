@@ -112,13 +112,23 @@ arithExprRest acc =
   <|> return acc
 
 term :: SigmaParser Value
-term = do { f <- factor; termRest f }
+term = do { p <- powerExpr; termRest p }
 
 termRest :: Value -> SigmaParser Value
 termRest acc =
-  (do _ <- multToken; f <- factor; termRest (numOp (*) acc f))
-  <|> (do _ <- divToken; f <- factor; termRest (evalDiv acc f))
-  <|> (do _ <- modToken; f <- factor; termRest (evalMod acc f))
+  (do _ <- multToken; p <- powerExpr; termRest (numOp (*) acc p))
+  <|> (do _ <- divToken; p <- powerExpr; termRest (evalDiv acc p))
+  <|> (do _ <- modToken; p <- powerExpr; termRest (evalMod acc p))
+  <|> return acc
+
+powerExpr :: SigmaParser Value
+powerExpr = do { f <- factor; powerExprRest f }
+
+powerExprRest :: Value -> SigmaParser Value
+powerExprRest acc =
+  (do _ <- expToken
+      p <- powerExpr
+      return (numOp (**) acc p))
   <|> return acc
 
 toIndex :: Value -> Int
