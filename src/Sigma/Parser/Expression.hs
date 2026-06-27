@@ -16,7 +16,20 @@ numOp op (VInt a)   (VInt b)   = let res = op (fromIntegral a) (fromIntegral b)
 numOp op (VFloat a) (VFloat b) = VFloat (op a b)
 numOp op (VInt a)   (VFloat b) = VFloat (op (fromIntegral a) b)
 numOp op (VFloat a) (VInt b)   = VFloat (op a (fromIntegral b))
-numOp _ _ _                    = error "Invalid data type in mathematical operation"
+numOp _ _ _                    = error "Type Error: Invalid data type in the mathematical operation"
+
+evalDiv :: Value -> Value -> Value
+evalDiv (VInt a) (VInt b) = VInt (a `mod` b)
+evalDiv a b               = numOp (/) a b
+
+evalMod :: Value -> Value -> Value
+evalMod (VInt a) (VInt b) = VInt (a `mod` b)
+evalMod _ _ = error "Type error: The modulo operator (%) can only be used with integers"
+
+evalUnaryMinus :: Value -> Value
+evalUnaryMinus (VInt i)   = VInt (-i)
+evalUnaryMinus (VFloat d) = VFloat (-d)
+evalUnaryMinus _          = error "Type error: The modulo operator (-) can only be used with numbers"
 
 evalRelop :: Token -> Value -> Value -> Bool
 evalRelop op (VInt a) (VInt b)     = evalRelop op (VFloat (fromIntegral a)) (VFloat (fromIntegral b))
@@ -28,13 +41,15 @@ evalRelop (Token _ Gt)  (VFloat a) (VFloat b) = a > b
 evalRelop (Token _ Lt)  (VFloat a) (VFloat b) = a < b
 evalRelop (Token _ Eq)  (VFloat a) (VFloat b) = a == b
 evalRelop (Token _ NEq) (VFloat a) (VFloat b) = a /= b
-evalRelop _ _ _ = error "Relational operator with invalid type"
+evalRelop (Token _ Eq)  (VString a) (VString b) = a == b
+evalRelop (Token _ NEq) (VString a) (VString b) = a /= b
+evalRelop (Token _ Eq)  (VBool a) (VBool b) = a == b
+evalRelop (Token _ NEq) (VBool a) (VBool b) = a /= b
+evalRelop _ _ _ = error "Erro de Tipo: Operador relacional usado com tipo invalido"
 
 showValue :: Value -> String
-showValue (VInt i)   = show i
-showValue (VFloat d)
-  | d == fromIntegral (round d :: Int) = show (round d :: Int)
-  | otherwise                          = show d
+showValue (VInt i)    = show i
+showValue (VFloat d)  = show d
 showValue (VString s) = s
 showValue (VBool b)   = if b then "true" else "false"
 showValue (VArray vs)  = "[" ++ intercalate ", " (map showValue vs) ++ "]"
@@ -42,56 +57,93 @@ showValue (VMatrix vs) = intercalate "\n" (map showRow vs)
   where showRow row = "[" ++ intercalate ", " (map showValue row) ++ "]"
 
 cond :: SigmaParser Bool
-cond = do { t <- boolTerm; condRest t }
-
-condRest :: Bool -> SigmaParser Bool
-condRest acc =
-  (do _ <- orToken; t <- boolTerm; condRest (acc || t))
-  <|> return acc
-
-boolTerm :: SigmaParser Bool
-boolTerm = do { f <- boolFactor; boolTermRest f }
-
-boolTermRest :: Bool -> SigmaParser Bool
-boolTermRest acc =
-  (do _ <- andToken; f <- boolFactor; boolTermRest (acc && f))
-  <|> return acc
-
-boolFactor :: SigmaParser Bool
-boolFactor = do
-  left  <- expr
-  op    <- relopToken
-  right <- expr
-  return (evalRelop op left right)
+cond = do
+  v <- expr
+  case v of
+    VBool b -> return b
+    _       -> fail "Type error: The condition requires a Boolean expression"
 
 expr :: SigmaParser Value
-expr = do { t <- term; exprRest t }
+expr = do { t <- andExpr; orExprRest t }
 
-exprRest :: Value -> SigmaParser Value
-exprRest acc =
-  (do _ <- addToken; t <- term; exprRest (numOp (+) acc t))
-  <|> (do _ <- subToken; t <- term; exprRest (numOp (-) acc t))
+orExprRest :: Value -> SigmaParser Value
+orExprRest acc =
+  (do _ <- orToken; t <- andExpr
+      case (acc, t) of
+        (VBool a, VBool b) -> orExprRest (VBool (a || b))
+        _ -> fail "Type error: The 'or' operator requires two Boolean values"
+  ) <|> return acc
+
+andExpr :: SigmaParser Value
+andExpr = do { f <- relExpr; andExprRest f }
+
+andExprRest :: Value -> SigmaParser Value
+andExprRest acc =
+  (do _ <- andToken; f <- relExpr
+      case (acc, f) of
+        (VBool a, VBool b) -> andExprRest (VBool (a && b))
+        _ -> fail "Type error: The 'and' operator requires two Boolean values"
+  ) <|> return acc
+
+relExpr :: SigmaParser Value
+relExpr = try (do
+  left  <- arithExpr
+  op    <- relopToken
+  right <- arithExpr
+  return (VBool (evalRelop op left right)))
+  <|> try (do
+  _ <- notToken
+  v <- relExpr
+  case v of
+    VBool b -> return (VBool (not b))
+    _ -> fail "Type error: The 'not' operator requires two Boolean values")
+  <|> arithExpr
+
+arithExpr :: SigmaParser Value
+arithExpr = do { t <- term; arithExprRest t }
+
+arithExprRest :: Value -> SigmaParser Value
+arithExprRest acc =
+  (do _ <- addToken; t <- term
+      let res = case (acc, t) of
+                  (VString s1, VString s2) -> VString (s1 ++ s2)
+                  (VString s1, v2)         -> VString (s1 ++ showValue v2)
+                  (v1, VString s2)         -> VString (showValue v1 ++ s2)
+                  _                        -> numOp (+) acc t
+      arithExprRest res)
+  <|> (do _ <- subToken; t <- term; arithExprRest (numOp (-) acc t))
   <|> return acc
 
 term :: SigmaParser Value
-term = do { f <- factor; termRest f }
+term = do { p <- powerExpr; termRest p }
 
 termRest :: Value -> SigmaParser Value
 termRest acc =
-  (do _ <- multToken; f <- factor; termRest (numOp (*) acc f))
-  <|> (do _ <- divToken; f <- factor; termRest (numOp (/) acc f))
+  (do _ <- multToken; p <- powerExpr; termRest (numOp (*) acc p))
+  <|> (do _ <- divToken; p <- powerExpr; termRest (evalDiv acc p))
+  <|> (do _ <- modToken; p <- powerExpr; termRest (evalMod acc p))
+  <|> return acc
+
+powerExpr :: SigmaParser Value
+powerExpr = do { f <- factor; powerExprRest f }
+
+powerExprRest :: Value -> SigmaParser Value
+powerExprRest acc =
+  (do _ <- expToken
+      p <- powerExpr
+      return (numOp (**) acc p))
   <|> return acc
 
 toIndex :: Value -> Int
 toIndex (VInt i)   = i
 toIndex (VFloat d) = truncate d
-toIndex _          = error "index must be an integer"
+toIndex _          = error "Index error: The index must be an integer"
 
 applyIndices :: Value -> [Value] -> Value
 applyIndices v [] = v
 applyIndices (VArray vs)  (i:rest) = applyIndices (vs !! toIndex i) rest
 applyIndices (VMatrix vs) (i:rest) = applyIndices (VArray (vs !! toIndex i)) rest
-applyIndices _ _ = error "value is not indexable"
+applyIndices _ _ = error "Type error: cannot be indexed."
 
 matrizBuiltin :: Token -> Maybe Token
 matrizBuiltin tok@(Token _ (Id s))
@@ -110,6 +162,10 @@ factor =
       line <- liftIO getLine
       return (VFloat (read line)))
   <|>
+  (do _ <- subToken
+      v <- factor
+      return (evalUnaryMinus v))
+  <|>
   (do _ <- lpToken; v <- expr; _ <- rpToken; return v)
   <|>
   (do Token _ (FloatLit d) <- floatLitToken; return (VFloat d))
@@ -120,8 +176,8 @@ factor =
   <|>
   (do tok <- tokenPrim show update_pos matrizBuiltin
       _ <- lpToken; rows <- expr; _ <- commaToken; cols <- expr; _ <- rpToken
-      let r = case rows of { VInt n -> n; VFloat n -> truncate n; _ -> error "matriz: rows must be int" }
-      let c = case cols of { VInt n -> n; VFloat n -> truncate n; _ -> error "matriz: cols must be int" }
+      let r = case rows of { VInt n -> n; VFloat n -> truncate n; _ -> error "Erro em Matriz: O numero de linhas deve ser inteiro" }
+      let c = case cols of { VInt n -> n; VFloat n -> truncate n; _ -> error "Erro em Matriz: O numero de colunas deve ser inteiro" }
       let def = case tok of
                   Token _ (Id "matrizFloat")  -> VFloat 0.0
                   Token _ (Id "matrizInt")    -> VInt 0
@@ -139,10 +195,9 @@ factor =
   (do Token _ (BoolLit b) <- boolLitToken; return (VBool b))
 
 explicitCast :: Token -> Value -> Value
-explicitCast (Token _ TInt)    v            = toInt v
-explicitCast (Token _ TFloat)  (VInt i)     = VFloat (fromIntegral i)
-explicitCast (Token _ TFloat)  (VFloat d)   = VFloat d
-explicitCast (Token _ TString) v            = VString (showValue v)
-explicitCast (Token _ TBool)   (VBool b)    = VBool b
-explicitCast (Token _ TBool)   (VInt i)     = VBool (i /= 0)
-explicitCast _ v                            = v
+explicitCast (Token _ TInt)    v = toInt v
+explicitCast (Token _ TFloat)  v = toFloat v
+explicitCast (Token _ TString) v         = VString (showValue v)
+explicitCast (Token _ TBool)   (VBool b) = VBool b
+explicitCast (Token _ TBool)   (VInt i)  = VBool (i /= 0)
+explicitCast _ v                         = v

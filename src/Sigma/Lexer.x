@@ -44,6 +44,7 @@ tokens :-
   "-"                              { \p s -> Token p Sub }
   "*"                              { \p s -> Token p Mult }
   "/"                              { \p s -> Token p Div }
+  "%"                              { \p s -> Token p Mod }
 
   -- literais estruturados
   \"[^\"]*\"                       { \p s -> Token p (StringLit (take (length s - 2) (drop 1 s))) }
@@ -73,6 +74,7 @@ data TokenClass
   | Sub
   | Mult
   | Div
+  | Mod
   | Exp
   | Eq
   | NEq
