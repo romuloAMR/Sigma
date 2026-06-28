@@ -58,9 +58,32 @@ funDecl envRef = do
   _ <- rcbToken
   return ()
 
+structField :: SigmaParser (String, Token)
+structField = do
+  nameToken <- idToken
+  _ <- colonToken
+  ty <- typeToken
+  _ <- semicolonToken
+  return (getId nameToken, ty)
+
+typeDeclStmt :: IORef Env -> SigmaParser ()
+typeDeclStmt _ = do
+  _ <- typeKwToken
+  nameToken <- idToken
+  _ <- assignToken
+  _ <- structToken
+  _ <- lcbToken
+  fields <- many1 structField
+  _ <- rcbToken
+  _ <- semicolonToken
+  updateState (registerType (getId nameToken) fields)
+
+topDecl :: IORef Env -> SigmaParser ()
+topDecl envRef = try (typeDeclStmt envRef) <|> funDecl envRef
+
 program :: IORef Env -> SigmaParser ()
 program envRef = do
-  _ <- many1 (funDecl envRef)
+  _ <- many1 (topDecl envRef)
   eof
 
 stmts :: IORef Env -> SigmaParser ()
@@ -232,6 +255,7 @@ assignStmt = do
                     (VBool _, VBool _)     -> True
                     (VArray _, VArray _)   -> True
                     (VMatrix _, VMatrix _) -> True
+                    (VStruct a _, VStruct b _) -> a == b
                     _                      -> False
   
   if typeMatch then do
@@ -266,6 +290,7 @@ declAssignStmt = do
                     (Token _ TFloat,  VArray _)  -> True
                     (Token _ TInt,    VMatrix _) -> True
                     (Token _ TFloat,  VMatrix _) -> True
+                    (Token _ (Id t),  VStruct s _) -> t == s
                     _                            -> False
 
   let isDeclaredLocally = case env of

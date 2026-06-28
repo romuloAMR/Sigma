@@ -33,6 +33,28 @@ env_update name val (scope : rest) =
     then (M.insert name val scope) : rest
     else scope : env_update name val rest
 
+typeKey :: String -> String
+typeKey name = "@type:" ++ name
+
+registerType :: String -> [(String, Token)] -> Env -> Env
+registerType name fields env =
+    case reverse env of
+        (bottom : upper) -> reverse (M.insert (typeKey name) (VTypeDef fields) bottom : upper)
+        []               -> error "Error: No active scope"
+
+lookupType :: String -> Env -> Maybe [(String, Token)]
+lookupType name env =
+    case env_lookupMaybe (typeKey name) env of
+        Just (VTypeDef fields) -> Just fields
+        _                      -> Nothing
+
+env_lookupMaybe :: String -> Env -> Maybe Value
+env_lookupMaybe _ [] = Nothing
+env_lookupMaybe name (scope : rest) =
+    case M.lookup name scope of
+        Just val -> Just val
+        Nothing  -> env_lookupMaybe name rest
+
 getId :: Token -> String
 getId (Token _ (Id s)) = s
 getId t                = error ("expected Id, obtained: " ++ show t)

@@ -13,7 +13,7 @@ mkTok :: TokenClass -> SigmaParser Token
 mkTok tc = tokenPrim show update_pos get_tok where
   get_tok tok@(Token _ c) = if c == tc then Just tok else Nothing
 
-funToken, lpToken, rpToken, lcbToken, rcbToken, semicolonToken, colonToken, assignToken, printToken, readToken, whileToken, ifToken, forToken, notToken, andToken, orToken, incToken, tintToken, addToken, subToken, multToken, divToken, modToken, expToken, commaToken :: SigmaParser Token
+funToken, lpToken, rpToken, lcbToken, rcbToken, semicolonToken, colonToken, assignToken, printToken, readToken, whileToken, ifToken, forToken, notToken, andToken, orToken, incToken, tintToken, addToken, subToken, multToken, divToken, modToken, expToken, commaToken, typeKwToken, structToken, dotToken :: SigmaParser Token
 funToken       = mkTok Fun
 lpToken        = mkTok LP
 rpToken        = mkTok RP
@@ -39,8 +39,11 @@ divToken       = mkTok Div
 modToken       = mkTok Mod
 expToken       = mkTok Exp
 commaToken     = mkTok Comma
+typeKwToken    = mkTok TType
+structToken    = mkTok Struct
+dotToken       = mkTok Dot
 
-idToken, intLitToken, floatLitToken, typeToken, returnTypeToken, relopToken, nextToken :: SigmaParser Token
+idToken, intLitToken, floatLitToken, castTypeToken, typeToken, returnTypeToken, relopToken, nextToken :: SigmaParser Token
 idToken = tokenPrim show update_pos get_tok where
   get_tok tok@(Token _ (Id _)) = Just tok
   get_tok _                    = Nothing
@@ -58,7 +61,7 @@ boolLitToken = tokenPrim show update_pos get_tok where
   get_tok tok@(Token _ (BoolLit _)) = Just tok
   get_tok _                         = Nothing
 
-typeToken = tokenPrim show update_pos get_tok where
+castTypeToken = tokenPrim show update_pos get_tok where
   get_tok tok@(Token _ TInt)    = Just tok
   get_tok tok@(Token _ TFloat)  = Just tok
   get_tok tok@(Token _ TBool)   = Just tok
@@ -83,6 +86,8 @@ relopToken = tokenPrim show update_pos get_tok where
   get_tok _                 = Nothing
 
 nextToken = tokenPrim show update_pos Just
+
+typeToken = castTypeToken <|> idToken
 
 typeAnnotation :: SigmaParser (Token, Int)
 typeAnnotation = do

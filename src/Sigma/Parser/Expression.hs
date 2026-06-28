@@ -55,6 +55,9 @@ showValue (VBool b)   = if b then "true" else "false"
 showValue (VArray vs)  = "[" ++ intercalate ", " (map showValue vs) ++ "]"
 showValue (VMatrix vs) = intercalate "\n" (map showRow vs)
   where showRow row = "[" ++ intercalate ", " (map showValue row) ++ "]"
+showValue (VStruct tyName fields) =
+  tyName ++ "{" ++ intercalate ", " (map (\(k, v) -> k ++ ": " ++ showValue v) fields) ++ "}"
+showValue (VTypeDef _) = "<type>"
 
 cond :: SigmaParser Bool
 cond = do
@@ -126,7 +129,17 @@ termRest acc =
   <|> return acc
 
 powerExpr :: SigmaParser Value
-powerExpr = do { f <- factor; powerExprRest f }
+powerExpr = do { f <- fieldExpr; powerExprRest f }
+
+fieldExpr :: SigmaParser Value
+fieldExpr = do { v <- factor; fieldExprRest v }
+
+fieldExprRest :: Value -> SigmaParser Value
+fieldExprRest acc =
+  (do _ <- dotToken
+      fieldToken <- idToken
+      fieldExprRest (readField acc (getId fieldToken)))
+  <|> return acc
 
 powerExprRest :: Value -> SigmaParser Value
 powerExprRest acc =
@@ -153,10 +166,10 @@ matrizBuiltin _ = Nothing
 
 factor :: SigmaParser Value
 factor =
-  (do tyTok <- typeToken   
-      _     <- lpToken     
-      v     <- expr        
-      _     <- rpToken     
+  (do tyTok <- castTypeToken
+      _     <- lpToken
+      v     <- expr
+      _     <- rpToken
       return (explicitCast tyTok v))
   <|>
   (do _ <- readToken; _ <- lpToken; _ <- rpToken
@@ -187,13 +200,43 @@ factor =
                   _                           -> VFloat 0.0
       return (VMatrix (replicate r (replicate c def))))
   <|>
+  (do Token _ (BoolLit b) <- boolLitToken; return (VBool b))
+  <|>
+  structConstructor
+  <|>
   (do nameToken <- idToken
       env <- getState
       let base = env_lookup (getId nameToken) env
       idxs <- many (do { _ <- mkTok LB; i <- expr; _ <- mkTok RB; return i })
       return (applyIndices base idxs))
-  <|>
-  (do Token _ (BoolLit b) <- boolLitToken; return (VBool b))
+
+structConstructor :: SigmaParser Value
+structConstructor = do
+  (name, fieldDefs) <- try (do
+    nameToken <- idToken
+    let name = getId nameToken
+    env <- getState
+    case lookupType name env of
+      Nothing        -> parserZero
+      Just fieldDefs -> do { _ <- lpToken; return (name, fieldDefs) })
+  args <- option [] argList
+  _ <- rpToken
+  if length args /= length fieldDefs
+    then fail ("Struct error: '" ++ name ++ "' expects " ++ show (length fieldDefs) ++ " fields but got " ++ show (length args))
+    else return (VStruct name (zipWith (\(fieldName, _) v -> (fieldName, v)) fieldDefs args))
+
+argList :: SigmaParser [Value]
+argList = do
+  first <- expr
+  rest  <- many (do { _ <- commaToken; expr })
+  return (first : rest)
+
+readField :: Value -> String -> Value
+readField (VStruct tyName fields) field =
+  case lookup field fields of
+    Just v  -> v
+    Nothing -> error ("Field error: struct '" ++ tyName ++ "' has no field '" ++ field ++ "'")
+readField _ field = error ("Field error: cannot access field '" ++ field ++ "' on a non-struct value")
 
 explicitCast :: Token -> Value -> Value
 explicitCast (Token _ TInt)    v = toInt v

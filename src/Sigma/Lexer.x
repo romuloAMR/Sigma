@@ -92,6 +92,8 @@ data TokenClass
   | While
   | For
   | Return
+  | TType
+  | Struct
   | Print
   | Read
   | Inc
@@ -115,6 +117,8 @@ decidirPalavra p s = Token p $ case s of
   "while"  -> While
   "for"    -> For
   "return" -> Return
+  "type"   -> TType
+  "struct" -> Struct
   "print"  -> Print
   "read"   -> Read
   "int"    -> TInt
