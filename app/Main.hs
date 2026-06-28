@@ -2,6 +2,7 @@ module Main (main) where
 
 import Sigma.Lexer (alexScanTokens)
 import Sigma.Parser (program)
+import Sigma.Environment (emptyEnv)
 import Text.Parsec (runParserT, errorPos, sourceLine, sourceColumn, ParseError)
 import Data.IORef (newIORef)
 import System.Environment (getArgs)
@@ -23,8 +24,8 @@ main = do
     _   -> error "Use: sigma <file.sg>"
   contents <- readFile fn
   let toks = alexScanTokens contents
-  envRef <- newIORef []
-  result <- runParserT (program envRef) [] fn toks
+  envRef <- newIORef emptyEnv
+  result <- runParserT (program envRef) emptyEnv fn toks
   case result of
     Left err -> putStrLn (showError contents err)
     Right () -> return ()

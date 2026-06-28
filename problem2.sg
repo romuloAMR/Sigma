@@ -19,8 +19,7 @@ fun main(): none {
         if (numero >= 76 and numero <= 100) {
             intervalo4++;
         }
-
-        numero = read();
+        numero = int(read());
     }
 
     print(intervalo1);

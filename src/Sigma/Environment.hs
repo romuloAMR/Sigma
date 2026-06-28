@@ -2,21 +2,36 @@ module Sigma.Environment where
 
 import Sigma.Types
 import Sigma.Lexer (Token(..), TokenClass(..))
+import qualified Data.Map.Strict as M
+
+emptyEnv :: Env
+emptyEnv = [M.empty]
+
+pushScope :: Env -> Env
+pushScope env = M.empty : env
+
+popScope :: Env -> Env
+popScope [] = [] 
+popScope (_:rest) = rest
 
 env_insert :: String -> Value -> Env -> Env
-env_insert name val env = env ++ [(name, val)]
-
-env_update :: String -> Value -> Env -> Env
-env_update name val [] = error ("Variable not declared: " ++ name)
-env_update name val ((n,v):rest)
-  | name == n = (name, val) : rest
-  | otherwise = (n, v) : env_update name val rest
+env_insert name val [] = error "Error: No active scope"
+env_insert name val (currentScope : rest) =
+    (M.insert name val currentScope) : rest
 
 env_lookup :: String -> Env -> Value
-env_lookup name [] = error ("Variable not found: " ++ name)
-env_lookup name ((n,v):rest)
-  | name == n = v
-  | otherwise = env_lookup name rest
+env_lookup name [] = error ("Semantic error: Variable not found: " ++ name)
+env_lookup name (scope : rest) =
+    case M.lookup name scope of
+        Just val -> val
+        Nothing  -> env_lookup name rest
+
+env_update :: String -> Value -> Env -> Env
+env_update name val [] = error ("Semantic error: Undeclared variable: " ++ name)
+env_update name val (scope : rest) =
+    if M.member name scope
+    then (M.insert name val scope) : rest
+    else scope : env_update name val rest
 
 getId :: Token -> String
 getId (Token _ (Id s)) = s
