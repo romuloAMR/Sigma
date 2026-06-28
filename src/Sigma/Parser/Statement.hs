@@ -10,10 +10,8 @@ import Sigma.Parser.Core
 import Sigma.Parser.Expression
 import Sigma.Runtime (returnSlot, setBodyRunner)
 import Sigma.Types
+import System.Environment (lookupEnv)
 import Text.Parsec
-
-debug :: Bool
-debug = True
 
 hideRegistry :: Bool
 hideRegistry = False
@@ -21,11 +19,19 @@ hideRegistry = False
 isReservedKey :: String -> Bool
 isReservedKey k = "@fun:" `isPrefixOf` k || "@type:" `isPrefixOf` k
 
+debugEnabled :: IO Bool
+debugEnabled = do
+  v <- lookupEnv "SIGMA_DEBUG"
+  return (v `elem` map Just ["1", "true", "True", "yes", "on"])
+
 debugEnv :: Env -> IO ()
-debugEnv env
-  | not debug = return ()
-  | hideRegistry = print (map (M.filterWithKey (\k _ -> not (isReservedKey k))) env)
-  | otherwise = print env
+debugEnv env = do
+  on <- debugEnabled
+  if not on
+    then return ()
+    else if hideRegistry
+      then print (map (M.filterWithKey (\k _ -> not (isReservedKey k))) env)
+      else print env
 
 runWithRef :: IORef Env -> [Token] -> SigmaParser () -> IO (Either ParseError ())
 runWithRef envRef toks p = do
