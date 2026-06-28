@@ -1,4 +1,4 @@
-module Sigma.Parser.Expression (expr, cond, numOp, evalRelop, showValue) where
+module Sigma.Parser.Expression (expr, cond, numOp, evalRelop, showValue, errorBuiltin) where
 
 import Text.Parsec
 import Control.Monad.IO.Class (liftIO)
@@ -163,6 +163,10 @@ matrizBuiltin :: Token -> Maybe Token
 matrizBuiltin tok@(Token _ (Id s))
   | s `elem` ["matrizFloat", "matrizInt", "matrizBool", "matrizString"] = Just tok
 matrizBuiltin _ = Nothing
+
+errorBuiltin :: Token -> Maybe Token
+errorBuiltin tok@(Token _ (Id "error")) = Just tok
+errorBuiltin _                          = Nothing
 
 factor :: SigmaParser Value
 factor =

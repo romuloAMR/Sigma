@@ -74,6 +74,7 @@ returnTypeToken = tokenPrim show update_pos get_tok where
   get_tok tok@(Token _ TBool)   = Just tok
   get_tok tok@(Token _ TString) = Just tok
   get_tok tok@(Token _ TNone)   = Just tok
+  get_tok tok@(Token _ (Id _))  = Just tok
   get_tok _                     = Nothing
 
 relopToken = tokenPrim show update_pos get_tok where

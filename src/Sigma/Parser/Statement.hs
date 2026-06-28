@@ -92,6 +92,7 @@ stmts envRef = (do { stmt envRef; stmts envRef }) <|> return ()
 stmt :: IORef Env -> SigmaParser ()
 stmt envRef
     =  try (printStmt envRef)
+   <|> try (errorStmt envRef)
    <|> try (whileStmt envRef)
    <|> try (forStmt envRef)
    <|> try (ifStmt envRef)
@@ -99,6 +100,15 @@ stmt envRef
    <|> try indexAssignStmt
    <|> try assignStmt
    <|> declAssignStmt
+
+errorStmt :: IORef Env -> SigmaParser ()
+errorStmt _ = do
+  _   <- tokenPrim show update_pos errorBuiltin
+  _   <- lpToken
+  msg <- expr
+  _   <- rpToken
+  _   <- semicolonToken
+  error (showValue msg)
 
 printStmt :: IORef Env -> SigmaParser ()
 printStmt _ = do
