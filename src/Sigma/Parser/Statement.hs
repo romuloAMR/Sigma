@@ -45,13 +45,20 @@ runFunctionBody calleeEnv body = do
   bodyRef <- newIORef calleeEnv
   result <-
     runParserT
-      (do _ <- stmts bodyRef; newEnv <- getState; liftIO (writeIORef bodyRef newEnv))
+      (do _ <- stmts bodyRef; ensureConsumed; newEnv <- getState; liftIO (writeIORef bodyRef newEnv))
       calleeEnv
       "sub"
       body
   case result of
     Left err -> error (show err)
     Right () -> readIORef bodyRef
+
+ensureConsumed :: SigmaParser ()
+ensureConsumed = do
+  returned <- liftIO (readIORef returnSlot)
+  case returned of
+    Just _  -> return ()
+    Nothing -> eof
 
 installRuntime :: IO ()
 installRuntime = setBodyRunner runFunctionBody

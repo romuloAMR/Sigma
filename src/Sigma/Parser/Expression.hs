@@ -266,7 +266,7 @@ functionCall = do
           calleeEnv = [frame, callerGlobal]
       result <- liftIO (callFunction calleeEnv body)
       case result of
-        Just v -> return v
+        Just v  -> return v
         Nothing -> fail ("Call error: function '" ++ name ++ "' did not return a value")
 
 callFunction :: Env -> [Token] -> IO (Maybe Value)
