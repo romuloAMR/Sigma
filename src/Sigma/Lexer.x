@@ -50,7 +50,7 @@ tokens :-
   \"[^\"]*\"                       { \p s -> Token p (StringLit (take (length s - 2) (drop 1 s))) }
   $digit+ "." $digit+              { \p s -> Token p (FloatLit (read s)) }
   $digit+                          { \p s -> Token p (IntLit (read s)) }
-  
+
   -- identificadores
   $alpha $idchar*                  { \p s -> decidirPalavra p s }
 

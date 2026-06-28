@@ -1,7 +1,7 @@
 module Main (main) where
 
 import Sigma.Lexer (alexScanTokens)
-import Sigma.Parser (program)
+import Sigma.Parser (program, installRuntime)
 import Sigma.Environment (emptyEnv)
 import Text.Parsec (runParserT, errorPos, sourceLine, sourceColumn, ParseError)
 import Data.IORef (newIORef)
@@ -23,6 +23,7 @@ main = do
     [f] -> return f
     _   -> error "Use: sigma <file.sg>"
   contents <- readFile fn
+  installRuntime
   let toks = alexScanTokens contents
   envRef <- newIORef emptyEnv
   result <- runParserT (program envRef) emptyEnv fn toks
