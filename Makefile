@@ -8,6 +8,13 @@ help: ## Show available commands
 	@echo "Available commands for Sigma project:"
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-10s\033[0m %s\n", $$1, $$2}'
 
+install: ## Install dependencies and highlighting
+	rm -rf ~/.vscode-server/extensions/sigma-lang  && \
+	cp -r sigma-lang/ ~/.vscode-server/extensions/  && \
+	cabal update && \
+	cabal install alex happy && \
+	make info
+
 info: ## Display versions of core components
 	@echo "--- Environment Versions ---"
 	@ghc --version

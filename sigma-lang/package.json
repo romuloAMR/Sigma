@@ -1,0 +1,33 @@
+{
+  "name": "sigma-lang",
+  "displayName": "Sigma Lang",
+  "description": "Syntax highlighting para a linguagem Sigma",
+  "version": "0.1.0",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "sigma",
+        "aliases": [
+          "Sigma",
+          "sigma"
+        ],
+        "extensions": [
+          ".sg"
+        ]
+      }
+    ],
+    "grammars": [
+      {
+        "language": "sigma",
+        "scopeName": "source.sigma",
+        "path": "./syntaxes/sigma.tmLanguage.json"
+      }
+    ]
+  }
+}
