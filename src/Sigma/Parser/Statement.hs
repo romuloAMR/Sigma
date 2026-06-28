@@ -8,6 +8,7 @@ import Sigma.Lexer
 import Sigma.Environment
 import Sigma.Parser.Core
 import Sigma.Parser.Expression
+import qualified Data.Map.Strict as M
 
 debug :: Bool
 debug = True
@@ -18,7 +19,14 @@ debugEnv env = if debug then print env else return ()
 runWithRef :: IORef Env -> [Token] -> SigmaParser () -> IO (Either ParseError ())
 runWithRef envRef toks p = do
   env <- readIORef envRef
-  result <- runParserT (do { r <- p; newEnv <- getState; liftIO (writeIORef envRef newEnv); return r }) env "sub" toks
+  result <- runParserT (do { r <- p; eof; newEnv <- getState; liftIO (writeIORef envRef newEnv); return r }) env "sub" toks
+  return result
+
+withNewScope :: SigmaParser a -> SigmaParser a
+withNewScope action = do
+  updateState pushScope
+  result <- action
+  updateState popScope
   return result
 
 paramGroup :: SigmaParser ()
@@ -95,21 +103,19 @@ whileStmt envRef = do
 whileLoop :: IORef Env -> [Token] -> [Token] -> IO ()
 whileLoop envRef condToks bodyToks = do
   env <- readIORef envRef
-  let outerKeys = map fst env
   condResult <- runParserT (do { c <- cond; return c }) env "cond" condToks
   case condResult of
     Left err -> error (show err)
     Right False -> return ()
     Right True  -> do
+      modifyIORef envRef pushScope
       result <- runWithRef envRef bodyToks (stmts envRef)
       case result of
         Left err -> error (show err)
         Right () -> do
-          afterBody <- readIORef envRef
-          writeIORef envRef (filter (\(k, _) -> k `elem` outerKeys) afterBody)
+          modifyIORef envRef popScope
           whileLoop envRef condToks bodyToks
 
--- for (id : type = expr ; cond ; id++) { stmts }
 forStmt :: IORef Env -> SigmaParser ()
 forStmt envRef = do
   _ <- forToken
@@ -124,16 +130,16 @@ forStmt envRef = do
   bodyToks <- collectBlock
   env <- getState
   liftIO $ writeIORef envRef env
-  let outerKeys = map fst env
+  liftIO $ modifyIORef envRef pushScope
+  
   let synSemi = case initToks of { (Token p _ : _) -> [Token p Semicolon]; [] -> [] }
   result <- liftIO $ runWithRef envRef (initToks ++ synSemi) declAssignStmt
   case result of
     Left err -> fail (show err)
     Right () -> liftIO $ forLoop envRef condToks incrToks bodyToks
+  liftIO $ modifyIORef envRef popScope
   finalEnv <- liftIO $ readIORef envRef
-  let cleanEnv = filter (\(k, _) -> k `elem` outerKeys) finalEnv
-  liftIO $ writeIORef envRef cleanEnv
-  putState cleanEnv
+  putState finalEnv
 
 forLoop :: IORef Env -> [Token] -> [Token] -> [Token] -> IO ()
 forLoop envRef condToks incrToks bodyToks = do
@@ -143,13 +149,12 @@ forLoop envRef condToks incrToks bodyToks = do
     Left err -> error (show err)
     Right False -> return ()
     Right True -> do
+      modifyIORef envRef pushScope
       bodyResult <- runWithRef envRef bodyToks (stmts envRef)
       case bodyResult of
         Left err -> error (show err)
         Right () -> do
-          afterBody <- readIORef envRef
-          let outerKeys = map fst env
-          writeIORef envRef (filter (\(k, _) -> k `elem` outerKeys) afterBody)
+          modifyIORef envRef popScope
           let synSemi = case incrToks of { (Token p _ : _) -> [Token p Semicolon]; [] -> [] }
           incrResult <- runWithRef envRef (incrToks ++ synSemi) incrementStmt
           case incrResult of
@@ -163,17 +168,10 @@ ifStmt envRef = do
   c <- cond
   _ <- rpToken
   _ <- lcbToken
-  outerEnv <- getState
-  let outerKeys = map fst outerEnv
-  let cleanup = do
-        env <- getState
-        putState (filter (\(k, _) -> k `elem` outerKeys) env)
-        liftIO . writeIORef envRef =<< getState
   if c
     then do
-      stmts envRef
+      withNewScope (stmts envRef)
       _ <- rcbToken
-      cleanup
       _ <- optionMaybe (try (do { _ <- mkTok Else; _ <- lcbToken; toks <- collectBlock; return toks }))
       return ()
     else do
@@ -181,7 +179,10 @@ ifStmt envRef = do
       hasElse <- optionMaybe (try (do { _ <- mkTok Else; _ <- lcbToken; return () }))
       case hasElse of
         Nothing -> return ()
-        Just _  -> do { stmts envRef; _ <- rcbToken; cleanup }
+        Just _  -> do 
+            withNewScope (stmts envRef)
+            _ <- rcbToken
+            return ()
 
 incrementStmt :: SigmaParser ()
 incrementStmt = do
@@ -267,12 +268,16 @@ declAssignStmt = do
                     (Token _ TFloat,  VMatrix _) -> True
                     _                            -> False
 
+  let isDeclaredLocally = case env of
+                            []        -> False
+                            (scope:_) -> M.member name scope
+
   if not typeMatch
     then do
       setPosition pos
       fail ("Type error: Type mismatch. Variable '" ++ name ++ "' cannot hold this type of value.")
     else
-      if name `elem` map fst env
+      if isDeclaredLocally
         then do
           setPosition pos
           fail ("Semantic error: variable '" ++ name ++ "' is declared in scope")
@@ -280,4 +285,3 @@ declAssignStmt = do
           updateState (env_insert name typedVal)
           newEnv <- getState
           liftIO $ debugEnv newEnv
-
