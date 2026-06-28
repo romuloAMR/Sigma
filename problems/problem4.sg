@@ -50,3 +50,48 @@ fun subprogram_c_div(a, b: rational_t): rational_t {
   b_inv: rational_t = subprogram_c_inv(b);
   return subprogram_c_multi(a, b_inv);
 }
+
+fun main(): none {
+  print("Numerador A:");
+  aNumerador: int = int(read());
+
+  print("Denomiador A:");
+  aDenominador: int = int(read());
+
+  print("Numerador B:");
+  bNumerador: int = int(read());
+
+  print("Denomiador B:");
+  bDenominador: int = int(read());
+
+  a: rational_t = subprogram_a(aNumerador, aDenominador);
+  b: rational_t = subprogram_a(bNumerador, bDenominador);
+
+  equals: bool = subprogram_b(a, b);
+  if (equals) {
+    print("Números racionais A e B são iguais");
+  } else {
+    print("Números racionais A e B não são iguais");
+  }
+
+  print("Soma de A e B:");
+  print(subprogram_c_sum(a, b));
+
+  print("Subtração de A e B:");
+  print(subprogram_c_sub(a, b));
+
+  print("Multiplicação de A e B");
+  print(subprogram_c_multi(a, b));
+
+  print("Divisão de A e B");
+  print(subprogram_c_div(a, b));
+
+  print("Negativo de A:");
+  print(subprogram_c_neg(a));
+
+  print("Inverso de A");
+  print(subprogram_c_inv(a));
+
+  print("Error intencional");
+  c: rational_t = subprogram_a(aNumerador, 0);
+}
