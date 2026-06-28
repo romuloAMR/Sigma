@@ -19,7 +19,7 @@ numOp op (VFloat a) (VInt b)   = VFloat (op a (fromIntegral b))
 numOp _ _ _                    = error "Type Error: Invalid data type in the mathematical operation"
 
 evalDiv :: Value -> Value -> Value
-evalDiv (VInt a) (VInt b) = VInt (a `mod` b)
+evalDiv (VInt a) (VInt b) = VInt (a `div` b)
 evalDiv a b               = numOp (/) a b
 
 evalMod :: Value -> Value -> Value
