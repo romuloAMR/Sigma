@@ -87,17 +87,18 @@ andExprRest acc =
 
 relExpr :: SigmaParser Value
 relExpr = try (do
-  left  <- arithExpr
-  op    <- relopToken
-  right <- arithExpr
-  return (VBool (evalRelop op left right)))
-  <|> try (do
   _ <- notToken
   v <- relExpr
   case v of
     VBool b -> return (VBool (not b))
-    _ -> fail "Type error: The 'not' operator requires two Boolean values")
-  <|> arithExpr
+    _ -> fail "Type error: The 'not' operator requires a Boolean value")
+  <|> do
+  left <- arithExpr
+  (do
+    op <- relopToken
+    right <- arithExpr
+    return (VBool (evalRelop op left right))
+   ) <|> return left
 
 arithExpr :: SigmaParser Value
 arithExpr = do { t <- term; arithExprRest t }
