@@ -1,6 +1,6 @@
 CABAL = cabal
 
-.PHONY: help info build run play clean
+.PHONY: help install info build run play clean test problem-1 problem-2 problem-3 problem-4
 
 .DEFAULT_GOAL := help
 
@@ -37,17 +37,19 @@ clean: ## Remove build artifacts
 	@echo "Cleaning build directories..."
 	$(CABAL) clean
 
+PROBLEMS_DIR = problems
+
 test: ## Merge Sort Test
-	cabal run sigma < test.sg
+	cabal run sigma < $(PROBLEMS_DIR)/test.sg
 
 problem-1: ## Run Problem 1
-	cabal run sigma -- problem1.sg
+	cabal run sigma -- $(PROBLEMS_DIR)/problem1.sg
 
 problem-2: ## Run Problem 2
-	cabal run sigma -- problem2.sg
+	cabal run sigma -- $(PROBLEMS_DIR)/problem2.sg
 
 problem-3: ## Run Problem 3
-	cabal run sigma -- problem3.sg
+	cabal run sigma -- $(PROBLEMS_DIR)/problem3.sg
 
-error-1: ## Run Error 1
-	cabal run sigma -- error1.sg=
+problem-4: ## Run Problem 4
+	cabal run sigma -- $(PROBLEMS_DIR)/problem4.sg
