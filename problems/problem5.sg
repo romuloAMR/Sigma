@@ -18,13 +18,13 @@ fun mdc(n, m: int, ref r: int): none {
 }
 
 fun main(): none {
-  print("n:");
+  print("Valor de N:");
   n: int = int(read());
 
-  print("m:");
+  print("Valor de M:");
   m: int = int(read());
 
-  resultado: int = 0;
+  r: int = 0;
   mdc(n, m, resultado);
-  print(resultado);
+  print(r);
 }
