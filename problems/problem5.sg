@@ -1,0 +1,30 @@
+fun mdc(n, m: int, ref r: int): none {
+  if (m % n == 0) {
+    r = n;
+    return;
+  }
+
+  if (n % m == 0) {
+    r = m;
+    return;
+  }
+
+  if (m > n) {
+    mdc(n, m % n, r);
+    return;
+  }
+
+  mdc(m, n % m, r);
+}
+
+fun main(): none {
+  print("n:");
+  n: int = int(read());
+
+  print("m:");
+  m: int = int(read());
+
+  resultado: int = 0;
+  mdc(n, m, resultado);
+  print(resultado);
+}
