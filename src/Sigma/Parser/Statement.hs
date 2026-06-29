@@ -69,15 +69,16 @@ ensureConsumed = do
 installRuntime :: IO ()
 installRuntime = setBodyRunner runFunctionBody
 
-paramGroup :: SigmaParser [String]
+paramGroup :: SigmaParser [(String, Bool)]
 paramGroup = do
+  isRef <- option False (do _ <- refToken; return True)
   first <- idToken
   rest <- many (try (do _ <- commaToken; idToken))
   _ <- colonToken
   _ <- returnTypeToken
-  return (map getId (first : rest))
+  return (map (\t -> (getId t, isRef)) (first : rest))
 
-params :: SigmaParser [String]
+params :: SigmaParser [(String, Bool)]
 params =
   ( do
       firstGroup <- paramGroup
@@ -153,14 +154,31 @@ stmt envRef =
     <|> try incrementStmt
     <|> try indexAssignStmt
     <|> try assignStmt
-    <|> declAssignStmt
+    <|> try declAssignStmt
+    <|> callStmt envRef
+
+callStmt :: IORef Env -> SigmaParser ()
+callStmt envRef = do
+  env0 <- getState
+  _ <- lookAhead
+    ( do
+        nameTok <- idToken
+        _ <- lpToken
+        case lookupFun (getId nameTok) env0 of
+          Just _  -> return ()
+          Nothing -> parserZero
+    )
+  _ <- expr
+  _ <- semicolonToken
+  env <- getState
+  liftIO (writeIORef envRef env)
 
 returnStmt :: IORef Env -> SigmaParser ()
 returnStmt _ = do
   _ <- returnToken
-  v <- expr
+  mv <- optionMaybe expr
   _ <- optionMaybe semicolonToken
-  liftIO (writeIORef returnSlot (Just v))
+  liftIO (writeIORef returnSlot (Just (maybe VVoid id mv)))
 
 errorStmt :: IORef Env -> SigmaParser ()
 errorStmt _ = do
@@ -285,13 +303,13 @@ incrementStmt = do
   _ <- semicolonToken
   let name = getId nameToken
   env <- getState
-  let val = env_lookup name env
+  val <- liftIO (derefValue (env_lookup name env))
   let newVal = case val of
         VInt i -> VInt (i + 1)
         VFloat v -> VFloat (v + 1)
         _ -> error ("It is not possible to increment the type: " ++ name)
-  updateState (env_update name newVal)
-  newEnv <- getState
+  newEnv <- liftIO (assignVar name newVal env)
+  putState newEnv
   liftIO $ debugEnv newEnv
 
 indexAssignStmt :: SigmaParser ()
@@ -318,7 +336,7 @@ assignStmt = do
   _ <- semicolonToken
   let name = getId nameToken
   env <- getState
-  let oldVal = env_lookup name env
+  oldVal <- liftIO (derefValue (env_lookup name env))
   let typeMatch = case (oldVal, val) of
         (VInt _, VInt _) -> True
         (VFloat _, VFloat _) -> True
@@ -331,8 +349,8 @@ assignStmt = do
 
   if typeMatch
     then do
-      updateState (env_update name val)
-      newEnv <- getState
+      newEnv <- liftIO (assignVar name val env)
+      putState newEnv
       liftIO $ debugEnv newEnv
     else
       fail ("Semantic Error: Incompatible type when assigning to the variable '" ++ name ++ "'")

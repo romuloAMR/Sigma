@@ -1,5 +1,6 @@
 module Sigma.Environment where
 
+import Data.IORef (newIORef, readIORef, writeIORef)
 import qualified Data.Map.Strict as M
 import Sigma.Lexer (Token (..), TokenClass (..))
 import Sigma.Types
@@ -51,13 +52,13 @@ lookupType name env =
 funKey :: String -> String
 funKey name = "@fun:" ++ name
 
-registerFun :: String -> [String] -> [Token] -> Env -> Env
+registerFun :: String -> [(String, Bool)] -> [Token] -> Env -> Env
 registerFun name params body env =
   case reverse env of
     (bottom : upper) -> reverse (M.insert (funKey name) (VFunction params body []) bottom : upper)
     [] -> error "Error: No active scope"
 
-lookupFun :: String -> Env -> Maybe ([String], [Token], Env)
+lookupFun :: String -> Env -> Maybe ([(String, Bool)], [Token], Env)
 lookupFun name env =
   case env_lookupMaybe (funKey name) env of
     Just (VFunction params body staticLink) -> Just (params, body, staticLink)
@@ -68,6 +69,25 @@ globalScope env =
   case reverse env of
     (bottom : _) -> bottom
     [] -> M.empty
+
+derefValue :: Value -> IO Value
+derefValue (VRef cell) = readIORef cell >>= derefValue
+derefValue v = return v
+
+assignVar :: String -> Value -> Env -> IO Env
+assignVar name newVal env =
+  case env_lookupMaybe name env of
+    Just (VRef cell) -> do writeIORef cell newVal; return env
+    _ -> return (env_update name newVal env)
+
+promoteToRef :: String -> Env -> IO (Value, Env)
+promoteToRef name env =
+  case env_lookupMaybe name env of
+    Just (VRef cell) -> return (VRef cell, env)
+    Just v -> do
+      cell <- newIORef v
+      return (VRef cell, env_update name (VRef cell) env)
+    Nothing -> error ("Semantic error: Variable not found: " ++ name)
 
 env_lookupMaybe :: String -> Env -> Maybe Value
 env_lookupMaybe _ [] = Nothing

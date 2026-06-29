@@ -20,6 +20,8 @@ numOp op (VInt a) (VInt b) =
 numOp op (VFloat a) (VFloat b) = VFloat (op a b)
 numOp op (VInt a) (VFloat b) = VFloat (op (fromIntegral a) b)
 numOp op (VFloat a) (VInt b) = VFloat (op a (fromIntegral b))
+numOp _ VVoid _ = error "Type Error: a function with return type 'none' (or missing 'return') was used as a value"
+numOp _ _ VVoid = error "Type Error: a function with return type 'none' (or missing 'return') was used as a value"
 numOp _ _ _ = error "Type Error: Invalid data type in the mathematical operation"
 
 evalDiv :: Value -> Value -> Value
@@ -63,6 +65,9 @@ showValue (VMatrix vs) = intercalate "\n" (map showRow vs)
 showValue (VStruct tyName fields) =
   tyName ++ "{" ++ intercalate ", " (map (\(k, v) -> k ++ ": " ++ showValue v) fields) ++ "}"
 showValue (VTypeDef _) = "<type>"
+showValue (VFunction {}) = "<function>"
+showValue (VRef _) = "<ref>"
+showValue VVoid = "none"
 
 cond :: SigmaParser Bool
 cond = do
@@ -238,7 +243,7 @@ factor =
     <|> ( do
             nameToken <- idToken
             env <- getState
-            let base = env_lookup (getId nameToken) env
+            base <- liftIO (derefValue (env_lookup (getId nameToken) env))
             idxs <- many (do _ <- mkTok LB; i <- expr; _ <- mkTok RB; return i)
             return (applyIndices base idxs)
         )
@@ -255,19 +260,37 @@ functionCall = do
             Nothing -> parserZero
             Just (params, body, _) -> do _ <- lpToken; return (name, params, body)
       )
-  args <- option [] argList
+  bindings <- parseArgs name params
   _ <- rpToken
-  if length args /= length params
-    then fail ("Call error: '" ++ name ++ "' expects " ++ show (length params) ++ " arguments but got " ++ show (length args))
-    else do
-      env <- getState
-      let callerGlobal = globalScope env
-          frame = M.fromList (zip params args)
-          calleeEnv = [frame, callerGlobal]
-      result <- liftIO (callFunction calleeEnv body)
-      case result of
-        Just v  -> return v
-        Nothing -> fail ("Call error: function '" ++ name ++ "' did not return a value")
+  env <- getState
+  let callerGlobal = globalScope env
+      frame = M.fromList (zip (map fst params) bindings)
+      calleeEnv = [frame, callerGlobal]
+  result <- liftIO (callFunction calleeEnv body)
+  case result of
+    Just v  -> return v
+    Nothing -> return VVoid
+
+parseArgs :: String -> [(String, Bool)] -> SigmaParser [Value]
+parseArgs name params = go params True
+  where
+    go [] _ = return []
+    go ((_, isRef) : rest) isFirst = do
+      if isFirst then return () else (commaToken >> return ()) <?> arityMsg
+      v <- parseArg name isRef
+      vs <- go rest False
+      return (v : vs)
+    arityMsg = "more arguments for call to '" ++ name ++ "'"
+
+parseArg :: String -> Bool -> SigmaParser Value
+parseArg name True = do
+  varTok <- idToken <?> ("a variable for the 'ref' argument of '" ++ name ++ "'")
+  let varName = getId varTok
+  env <- getState
+  (refVal, env') <- liftIO (promoteToRef varName env)
+  putState env'
+  return refVal
+parseArg _ False = expr
 
 callFunction :: Env -> [Token] -> IO (Maybe Value)
 callFunction calleeEnv body = do

@@ -14,7 +14,7 @@ mkTok tc = tokenPrim show update_pos get_tok
   where
     get_tok tok@(Token _ c) = if c == tc then Just tok else Nothing
 
-funToken, lpToken, rpToken, lcbToken, rcbToken, semicolonToken, colonToken, assignToken, printToken, readToken, whileToken, ifToken, forToken, notToken, andToken, orToken, incToken, tintToken, addToken, subToken, multToken, divToken, modToken, expToken, commaToken, typeKwToken, structToken, dotToken, returnToken :: SigmaParser Token
+funToken, lpToken, rpToken, lcbToken, rcbToken, semicolonToken, colonToken, assignToken, printToken, readToken, whileToken, ifToken, forToken, notToken, andToken, orToken, incToken, tintToken, addToken, subToken, multToken, divToken, modToken, expToken, commaToken, typeKwToken, structToken, dotToken, returnToken, refToken :: SigmaParser Token
 funToken = mkTok Fun
 lpToken = mkTok LP
 rpToken = mkTok RP
@@ -44,6 +44,7 @@ typeKwToken = mkTok TType
 structToken = mkTok Struct
 dotToken = mkTok Dot
 returnToken = mkTok Return
+refToken = mkTok Ref
 
 idToken, intLitToken, floatLitToken, castTypeToken, typeToken, returnTypeToken, relopToken, nextToken :: SigmaParser Token
 idToken = tokenPrim show update_pos get_tok
