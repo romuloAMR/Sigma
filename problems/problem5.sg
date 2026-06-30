@@ -25,6 +25,6 @@ fun main(): none {
   m: int = int(read());
 
   r: int = 0;
-  mdc(n, m, resultado);
+  mdc(n, m, r);
   print(r);
 }
