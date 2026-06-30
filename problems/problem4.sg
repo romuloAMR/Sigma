@@ -12,7 +12,7 @@ fun subprogram_a(a, b : int): rational_t {
 }
 
 fun subprogram_b(a, b : rational_t): bool {
-  return (a.numerador / b.numerador == a.denominador / b.denominador);
+  return (float(a.numerador) / float(a.denominador) == float(b.numerador) / float(b.denominador));
 }
 
 fun subprogram_c_sum(a, b: rational_t): rational_t {
