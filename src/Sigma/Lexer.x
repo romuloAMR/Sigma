@@ -94,6 +94,7 @@ data TokenClass
   | Return
   | TType
   | Struct
+  | Ref
   | Print
   | Read
   | Inc
@@ -119,6 +120,7 @@ decidirPalavra p s = Token p $ case s of
   "return" -> Return
   "type"   -> TType
   "struct" -> Struct
+  "ref"    -> Ref
   "print"  -> Print
   "read"   -> Read
   "int"    -> TInt

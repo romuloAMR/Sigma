@@ -1,0 +1,52 @@
+type rational_t = struct {
+  numerador: int;
+  denominador: int;
+};
+
+fun subprogram_a(a, b : int): rational_t {
+  if (b == 0) {
+    error("Parâmetro b não pode ser zero");
+  }
+
+  return rational_t(a, b);
+}
+
+fun subprogram_b(a, b : rational_t): bool {
+  return (a.numerador / b.numerador == a.denominador / b.denominador);
+}
+
+fun subprogram_c_sum(a, b: rational_t): rational_t {
+  return rational_t(
+    a.numerador * b.denominador + a.denominador * b.numerador,
+    a.denominador * b.denominador
+  );
+}
+
+fun subprogram_c_neg(a: rational_t): rational_t {
+  return rational_t(
+    -a.numerador, -a.denominador
+  )
+}
+
+fun subprogram_c_sub(a, b: rational_t):  rational_t {
+  return rational_t(
+    a.numerador * b.denominador - a.denominador * b.numerador,
+    a.denominador * b.denominador
+  );
+}
+
+fun subprogram_c_multi(a, b: rational_t): rational_t {
+  return rational_t(
+    a.numerador * b.numerador,
+    a.denominador * b.denominador
+  );
+}
+
+fun subprogram_c_inv(a: rational_t): rational_t {
+  return rational_t(a.denominador, a.numerador);
+}
+
+fun subprogram_c_div(a, b: rational_t): rational_t {
+  b_inv: rational_t = subprogram_c_inv(b);
+  return subprogram_c_multi(a, b_inv);
+}

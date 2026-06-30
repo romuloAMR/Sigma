@@ -1,6 +1,6 @@
 CABAL = cabal
 
-.PHONY: help install info build run play clean test problem-1 problem-2 problem-3 problem-4
+.PHONY: help install info build run play clean test problem-1 problem-2 problem-3 problem-4 problem-5
 
 .DEFAULT_GOAL := help
 
@@ -57,3 +57,6 @@ problem-3: ## Run Problem 3 (DEBUG=1 to show env dumps)
 
 problem-4: ## Run Problem 4 (DEBUG=1 to show env dumps)
 	$(SIGMA_ENV) cabal run sigma -- $(PROBLEMS_DIR)/problem4.sg
+
+problem-5: ## Run Problem 5 (DEBUG=1 to show env dumps)
+	$(SIGMA_ENV) cabal run sigma -- $(PROBLEMS_DIR)/problem5.sg

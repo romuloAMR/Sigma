@@ -35,10 +35,11 @@ common warnings
     ghc-options: -Wall
 
 library
-    exposed-modules:  
+    exposed-modules:
         Sigma.Lexer
         Sigma.Types
         Sigma.Environment
+        Sigma.Runtime
         Sigma.Parser
         Sigma.Parser.Core
         Sigma.Parser.Expression
