@@ -1,0 +1,10 @@
+type node = struct {
+  value: int;
+  leftChild: node;
+  rightChild: node;
+};
+
+fun main(): none {
+  nozin: node = node(8, null, null);
+  print(null);
+}
