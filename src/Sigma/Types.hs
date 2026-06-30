@@ -17,6 +17,7 @@ data Value
   | VFunction [(String, Bool)] [Token] Env
   | VRef (IORef Value)
   | VVoid
+  | VNull
 
 instance Show Value where
   show (VInt i)         = "VInt " ++ show i
@@ -30,6 +31,7 @@ instance Show Value where
   show (VFunction ps body env) = "VFunction " ++ show ps ++ " " ++ show body ++ " " ++ show env
   show (VRef _)         = "VRef <cell>"
   show VVoid            = "VVoid"
+  show VNull            = "VNull"
 
 instance Eq Value where
   VInt a       == VInt b       = a == b
@@ -40,6 +42,7 @@ instance Eq Value where
   VMatrix a    == VMatrix b    = a == b
   VStruct n fs == VStruct m gs = n == m && fs == gs
   VTypeDef a   == VTypeDef b   = a == b
+  VNull        == VNull        = True
   _            == _            = False
 
 type Scope = M.Map String Value

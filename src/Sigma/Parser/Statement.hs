@@ -345,6 +345,9 @@ assignStmt = do
         (VArray _, VArray _) -> True
         (VMatrix _, VMatrix _) -> True
         (VStruct a _, VStruct b _) -> a == b
+        (VStruct _ _, VNull) -> True
+        (VNull, VStruct _ _) -> True
+        (VNull, VNull) -> True
         _ -> False
 
   if typeMatch
@@ -381,6 +384,7 @@ declAssignStmt = do
         (Token _ TInt, VMatrix _) -> True
         (Token _ TFloat, VMatrix _) -> True
         (Token _ (Id t), VStruct s _) -> t == s
+        (Token _ (Id _), VNull) -> True
         _ -> False
 
   let isDeclaredLocally = case env of

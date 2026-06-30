@@ -51,6 +51,12 @@ evalRelop (Token _ Eq) (VString a) (VString b) = a == b
 evalRelop (Token _ NEq) (VString a) (VString b) = a /= b
 evalRelop (Token _ Eq) (VBool a) (VBool b) = a == b
 evalRelop (Token _ NEq) (VBool a) (VBool b) = a /= b
+evalRelop (Token _ Eq) VNull VNull = True
+evalRelop (Token _ Eq) VNull _ = False
+evalRelop (Token _ Eq) _ VNull = False
+evalRelop (Token _ NEq) VNull VNull = False
+evalRelop (Token _ NEq) VNull _ = True
+evalRelop (Token _ NEq) _ VNull = True
 evalRelop _ _ _ = error "Erro de Tipo: Operador relacional usado com tipo invalido"
 
 showValue :: Value -> String
@@ -68,6 +74,7 @@ showValue (VTypeDef _) = "<type>"
 showValue (VFunction {}) = "<function>"
 showValue (VRef _) = "<ref>"
 showValue VVoid = "none"
+showValue VNull = "null"
 
 cond :: SigmaParser Bool
 cond = do
@@ -197,13 +204,14 @@ errorBuiltin _ = Nothing
 
 factor :: SigmaParser Value
 factor =
-  ( do
-      tyTok <- castTypeToken
-      _ <- lpToken
-      v <- expr
-      _ <- rpToken
-      return (explicitCast tyTok v)
-  )
+  (do _ <- nullToken; return VNull)
+    <|> ( do
+            tyTok <- castTypeToken
+            _ <- lpToken
+            v <- expr
+            _ <- rpToken
+            return (explicitCast tyTok v)
+        )
     <|> ( do
             _ <- readToken
             _ <- lpToken
