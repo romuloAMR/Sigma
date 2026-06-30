@@ -1,6 +1,6 @@
 CABAL = cabal
 
-.PHONY: help info build run play clean
+.PHONY: help install info build run play clean test problem-1 problem-2 problem-3 problem-4
 
 .DEFAULT_GOAL := help
 
@@ -37,17 +37,23 @@ clean: ## Remove build artifacts
 	@echo "Cleaning build directories..."
 	$(CABAL) clean
 
-test: ## Merge Sort Test
-	cabal run sigma < test.sg
+PROBLEMS_DIR = problems
 
-problem-1: ## Run Problem 1
-	cabal run sigma -- problem1.sg
+# Debug is off by default. Enable with: make problem-4 DEBUG=1
+DEBUG ?=
+SIGMA_ENV = SIGMA_DEBUG=$(DEBUG)
 
-problem-2: ## Run Problem 2
-	cabal run sigma -- problem2.sg
+test: ## Merge Sort Test (DEBUG=1 to show env dumps)
+	$(SIGMA_ENV) cabal run sigma < $(PROBLEMS_DIR)/test.sg
 
-problem-3: ## Run Problem 3
-	cabal run sigma -- problem3.sg
+problem-1: ## Run Problem 1 (DEBUG=1 to show env dumps)
+	$(SIGMA_ENV) cabal run sigma -- $(PROBLEMS_DIR)/problem1.sg
 
-error-1: ## Run Error 1
-	cabal run sigma -- error1.sg=
+problem-2: ## Run Problem 2 (DEBUG=1 to show env dumps)
+	$(SIGMA_ENV) cabal run sigma -- $(PROBLEMS_DIR)/problem2.sg
+
+problem-3: ## Run Problem 3 (DEBUG=1 to show env dumps)
+	$(SIGMA_ENV) cabal run sigma -- $(PROBLEMS_DIR)/problem3.sg
+
+problem-4: ## Run Problem 4 (DEBUG=1 to show env dumps)
+	$(SIGMA_ENV) cabal run sigma -- $(PROBLEMS_DIR)/problem4.sg

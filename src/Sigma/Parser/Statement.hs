@@ -1,25 +1,42 @@
-module Sigma.Parser.Statement (stmts, program, funDecl) where
+module Sigma.Parser.Statement (stmts, program, funDecl, installRuntime) where
 
-import Text.Parsec
 import Control.Monad.IO.Class (liftIO)
 import Data.IORef
-import Sigma.Types
-import Sigma.Lexer
+import Data.List (isPrefixOf)
+import qualified Data.Map.Strict as M
 import Sigma.Environment
+import Sigma.Lexer
 import Sigma.Parser.Core
 import Sigma.Parser.Expression
-import qualified Data.Map.Strict as M
+import Sigma.Runtime (returnSlot, setBodyRunner)
+import Sigma.Types
+import System.Environment (lookupEnv)
+import Text.Parsec
 
-debug :: Bool
-debug = True
+hideRegistry :: Bool
+hideRegistry = False
+
+isReservedKey :: String -> Bool
+isReservedKey k = "@fun:" `isPrefixOf` k || "@type:" `isPrefixOf` k
+
+debugEnabled :: IO Bool
+debugEnabled = do
+  v <- lookupEnv "SIGMA_DEBUG"
+  return (v `elem` map Just ["1", "true", "True", "yes", "on"])
 
 debugEnv :: Env -> IO ()
-debugEnv env = if debug then print env else return ()
+debugEnv env = do
+  on <- debugEnabled
+  if not on
+    then return ()
+    else if hideRegistry
+      then print (map (M.filterWithKey (\k _ -> not (isReservedKey k))) env)
+      else print env
 
 runWithRef :: IORef Env -> [Token] -> SigmaParser () -> IO (Either ParseError ())
 runWithRef envRef toks p = do
   env <- readIORef envRef
-  result <- runParserT (do { r <- p; eof; newEnv <- getState; liftIO (writeIORef envRef newEnv); return r }) env "sub" toks
+  result <- runParserT (do r <- p; eof; newEnv <- getState; liftIO (writeIORef envRef newEnv); return r) env "sub" toks
   return result
 
 withNewScope :: SigmaParser a -> SigmaParser a
@@ -29,53 +46,130 @@ withNewScope action = do
   updateState popScope
   return result
 
-paramGroup :: SigmaParser ()
+runFunctionBody :: Env -> [Token] -> IO Env
+runFunctionBody calleeEnv body = do
+  bodyRef <- newIORef calleeEnv
+  result <-
+    runParserT
+      (do _ <- stmts bodyRef; ensureConsumed; newEnv <- getState; liftIO (writeIORef bodyRef newEnv))
+      calleeEnv
+      "sub"
+      body
+  case result of
+    Left err -> error (show err)
+    Right () -> readIORef bodyRef
+
+ensureConsumed :: SigmaParser ()
+ensureConsumed = do
+  returned <- liftIO (readIORef returnSlot)
+  case returned of
+    Just _  -> return ()
+    Nothing -> eof
+
+installRuntime :: IO ()
+installRuntime = setBodyRunner runFunctionBody
+
+paramGroup :: SigmaParser [String]
 paramGroup = do
-  _ <- idToken
-  _ <- many (try (do { _ <- commaToken; idToken }))
+  first <- idToken
+  rest <- many (try (do _ <- commaToken; idToken))
   _ <- colonToken
   _ <- returnTypeToken
-  return ()
+  return (map getId (first : rest))
 
-params :: SigmaParser ()
+params :: SigmaParser [String]
 params =
-  (do paramGroup
-      _ <- many (try (do { _ <- commaToken; paramGroup }))
-      return ())
-  <|> return ()
+  ( do
+      firstGroup <- paramGroup
+      restGroups <- many (try (do _ <- commaToken; paramGroup))
+      return (concat (firstGroup : restGroups))
+  )
+    <|> return []
 
 funDecl :: IORef Env -> SigmaParser ()
 funDecl envRef = do
   _ <- funToken
-  _ <- idToken
+  nameToken <- idToken
   _ <- lpToken
-  params
+  paramNames <- params
   _ <- rpToken
   _ <- colonToken
   _ <- returnTypeToken
   _ <- lcbToken
-  stmts envRef
+  body <- collectBlock
+  updateState (registerFun (getId nameToken) paramNames body)
+  env <- getState
+  liftIO $ writeIORef envRef env
+
+structField :: SigmaParser (String, Token)
+structField = do
+  nameToken <- idToken
+  _ <- colonToken
+  ty <- typeToken
+  _ <- semicolonToken
+  return (getId nameToken, ty)
+
+typeDeclStmt :: IORef Env -> SigmaParser ()
+typeDeclStmt _ = do
+  _ <- typeKwToken
+  nameToken <- idToken
+  _ <- assignToken
+  _ <- structToken
+  _ <- lcbToken
+  fields <- many1 structField
   _ <- rcbToken
-  return ()
+  _ <- semicolonToken
+  updateState (registerType (getId nameToken) fields)
+
+topDecl :: IORef Env -> SigmaParser ()
+topDecl envRef = try (typeDeclStmt envRef) <|> funDecl envRef
 
 program :: IORef Env -> SigmaParser ()
 program envRef = do
-  _ <- many1 (funDecl envRef)
+  _ <- many1 (topDecl envRef)
   eof
+  env <- getState
+  case lookupFun "main" env of
+    Just (_, body, _) -> do
+      _ <- liftIO (runFunctionBody [globalScope env] body)
+      return ()
+    Nothing -> return ()
 
 stmts :: IORef Env -> SigmaParser ()
-stmts envRef = (do { stmt envRef; stmts envRef }) <|> return ()
+stmts envRef = do
+  returned <- liftIO (readIORef returnSlot)
+  case returned of
+    Just _ -> return ()
+    Nothing -> (do stmt envRef; stmts envRef) <|> return ()
 
 stmt :: IORef Env -> SigmaParser ()
-stmt envRef
-    =  try (printStmt envRef)
-   <|> try (whileStmt envRef)
-   <|> try (forStmt envRef)
-   <|> try (ifStmt envRef)
-   <|> try incrementStmt
-   <|> try indexAssignStmt
-   <|> try assignStmt
-   <|> declAssignStmt
+stmt envRef =
+  try (printStmt envRef)
+    <|> try (errorStmt envRef)
+    <|> try (returnStmt envRef)
+    <|> try (whileStmt envRef)
+    <|> try (forStmt envRef)
+    <|> try (ifStmt envRef)
+    <|> try incrementStmt
+    <|> try indexAssignStmt
+    <|> try assignStmt
+    <|> declAssignStmt
+
+returnStmt :: IORef Env -> SigmaParser ()
+returnStmt _ = do
+  _ <- returnToken
+  v <- expr
+  _ <- optionMaybe semicolonToken
+  liftIO (writeIORef returnSlot (Just v))
+
+errorStmt :: IORef Env -> SigmaParser ()
+errorStmt _ = do
+  _ <- tokenPrim show update_pos errorBuiltin
+  _ <- lpToken
+  msg <- expr
+  _ <- rpToken
+  _ <- semicolonToken
+  error (showValue msg)
 
 printStmt :: IORef Env -> SigmaParser ()
 printStmt _ = do
@@ -103,11 +197,11 @@ whileStmt envRef = do
 whileLoop :: IORef Env -> [Token] -> [Token] -> IO ()
 whileLoop envRef condToks bodyToks = do
   env <- readIORef envRef
-  condResult <- runParserT (do { c <- cond; return c }) env "cond" condToks
+  condResult <- runParserT (do c <- cond; return c) env "cond" condToks
   case condResult of
     Left err -> error (show err)
     Right False -> return ()
-    Right True  -> do
+    Right True -> do
       modifyIORef envRef pushScope
       result <- runWithRef envRef bodyToks (stmts envRef)
       case result of
@@ -131,8 +225,8 @@ forStmt envRef = do
   env <- getState
   liftIO $ writeIORef envRef env
   liftIO $ modifyIORef envRef pushScope
-  
-  let synSemi = case initToks of { (Token p _ : _) -> [Token p Semicolon]; [] -> [] }
+
+  let synSemi = case initToks of (Token p _ : _) -> [Token p Semicolon]; [] -> []
   result <- liftIO $ runWithRef envRef (initToks ++ synSemi) declAssignStmt
   case result of
     Left err -> fail (show err)
@@ -144,7 +238,7 @@ forStmt envRef = do
 forLoop :: IORef Env -> [Token] -> [Token] -> [Token] -> IO ()
 forLoop envRef condToks incrToks bodyToks = do
   env <- readIORef envRef
-  condResult <- runParserT (do { c <- cond; return c }) env "cond" condToks
+  condResult <- runParserT (do c <- cond; return c) env "cond" condToks
   case condResult of
     Left err -> error (show err)
     Right False -> return ()
@@ -155,7 +249,7 @@ forLoop envRef condToks incrToks bodyToks = do
         Left err -> error (show err)
         Right () -> do
           modifyIORef envRef popScope
-          let synSemi = case incrToks of { (Token p _ : _) -> [Token p Semicolon]; [] -> [] }
+          let synSemi = case incrToks of (Token p _ : _) -> [Token p Semicolon]; [] -> []
           incrResult <- runWithRef envRef (incrToks ++ synSemi) incrementStmt
           case incrResult of
             Left err -> error (show err)
@@ -172,17 +266,17 @@ ifStmt envRef = do
     then do
       withNewScope (stmts envRef)
       _ <- rcbToken
-      _ <- optionMaybe (try (do { _ <- mkTok Else; _ <- lcbToken; toks <- collectBlock; return toks }))
+      _ <- optionMaybe (try (do _ <- mkTok Else; _ <- lcbToken; toks <- collectBlock; return toks))
       return ()
     else do
       _ <- collectBlock
-      hasElse <- optionMaybe (try (do { _ <- mkTok Else; _ <- lcbToken; return () }))
+      hasElse <- optionMaybe (try (do _ <- mkTok Else; _ <- lcbToken; return ()))
       case hasElse of
         Nothing -> return ()
-        Just _  -> do 
-            withNewScope (stmts envRef)
-            _ <- rcbToken
-            return ()
+        Just _ -> do
+          withNewScope (stmts envRef)
+          _ <- rcbToken
+          return ()
 
 incrementStmt :: SigmaParser ()
 incrementStmt = do
@@ -193,9 +287,9 @@ incrementStmt = do
   env <- getState
   let val = env_lookup name env
   let newVal = case val of
-                 VInt i   -> VInt (i + 1)
-                 VFloat v -> VFloat (v + 1)
-                 _        -> error ("It is not possible to increment the type: " ++ name)
+        VInt i -> VInt (i + 1)
+        VFloat v -> VFloat (v + 1)
+        _ -> error ("It is not possible to increment the type: " ++ name)
   updateState (env_update name newVal)
   newEnv <- getState
   liftIO $ debugEnv newEnv
@@ -203,14 +297,14 @@ incrementStmt = do
 indexAssignStmt :: SigmaParser ()
 indexAssignStmt = do
   nameToken <- idToken
-  idxs <- many1 (do { _ <- mkTok LB; i <- expr; _ <- mkTok RB; return i })
+  idxs <- many1 (do _ <- mkTok LB; i <- expr; _ <- mkTok RB; return i)
   _ <- assignToken
   val <- expr
   _ <- semicolonToken
   let name = getId nameToken
   env <- getState
   let base = env_lookup name env
-  let idxInts = map (\i -> case i of { VInt n -> n; VFloat n -> truncate n; _ -> error "index must be int" }) idxs
+  let idxInts = map (\i -> case i of VInt n -> n; VFloat n -> truncate n; _ -> error "index must be int") idxs
   let newBase = indexedUpdate base idxInts val
   updateState (env_update name newBase)
   newEnv <- getState
@@ -226,20 +320,22 @@ assignStmt = do
   env <- getState
   let oldVal = env_lookup name env
   let typeMatch = case (oldVal, val) of
-                    (VInt _, VInt _)       -> True
-                    (VFloat _, VFloat _)   -> True
-                    (VString _, VString _) -> True
-                    (VBool _, VBool _)     -> True
-                    (VArray _, VArray _)   -> True
-                    (VMatrix _, VMatrix _) -> True
-                    _                      -> False
-  
-  if typeMatch then do
-    updateState (env_update name val)
-    newEnv <- getState
-    liftIO $ debugEnv newEnv
-  else
-    fail ("Semantic Error: Incompatible type when assigning to the variable '" ++ name ++ "'")
+        (VInt _, VInt _) -> True
+        (VFloat _, VFloat _) -> True
+        (VString _, VString _) -> True
+        (VBool _, VBool _) -> True
+        (VArray _, VArray _) -> True
+        (VMatrix _, VMatrix _) -> True
+        (VStruct a _, VStruct b _) -> a == b
+        _ -> False
+
+  if typeMatch
+    then do
+      updateState (env_update name val)
+      newEnv <- getState
+      liftIO $ debugEnv newEnv
+    else
+      fail ("Semantic Error: Incompatible type when assigning to the variable '" ++ name ++ "'")
 
 declAssignStmt :: ParsecT [Token] Env IO ()
 declAssignStmt = do
@@ -248,29 +344,30 @@ declAssignStmt = do
   _ <- colonToken
   (tyToken, dims) <- typeAnnotation
   _ <- assignToken
-  val       <- expr
+  val <- expr
   _ <- semicolonToken
-  let name     = getId nameToken
+  let name = getId nameToken
   let typedVal = case dims of
-                   0 -> coerce tyToken val
-                   1 -> case val of { VArray _  -> val; _ -> error "expected array initializer" }
-                   _ -> case val of { VMatrix _ -> val; _ -> error "expected matrix initializer" }
+        0 -> coerce tyToken val
+        1 -> case val of VArray _ -> val; _ -> error "expected array initializer"
+        _ -> case val of VMatrix _ -> val; _ -> error "expected matrix initializer"
   env <- getState
 
   let typeMatch = case (tyToken, typedVal) of
-                    (Token _ TInt,    VInt _)    -> True
-                    (Token _ TFloat,  VFloat _)  -> True
-                    (Token _ TString, VString _) -> True
-                    (Token _ TBool,   VBool _)   -> True
-                    (Token _ TInt,    VArray _)  -> True
-                    (Token _ TFloat,  VArray _)  -> True
-                    (Token _ TInt,    VMatrix _) -> True
-                    (Token _ TFloat,  VMatrix _) -> True
-                    _                            -> False
+        (Token _ TInt, VInt _) -> True
+        (Token _ TFloat, VFloat _) -> True
+        (Token _ TString, VString _) -> True
+        (Token _ TBool, VBool _) -> True
+        (Token _ TInt, VArray _) -> True
+        (Token _ TFloat, VArray _) -> True
+        (Token _ TInt, VMatrix _) -> True
+        (Token _ TFloat, VMatrix _) -> True
+        (Token _ (Id t), VStruct s _) -> t == s
+        _ -> False
 
   let isDeclaredLocally = case env of
-                            []        -> False
-                            (scope:_) -> M.member name scope
+        [] -> False
+        (scope : _) -> M.member name scope
 
   if not typeMatch
     then do

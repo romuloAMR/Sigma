@@ -50,7 +50,7 @@ tokens :-
   \"[^\"]*\"                       { \p s -> Token p (StringLit (take (length s - 2) (drop 1 s))) }
   $digit+ "." $digit+              { \p s -> Token p (FloatLit (read s)) }
   $digit+                          { \p s -> Token p (IntLit (read s)) }
-  
+
   -- identificadores
   $alpha $idchar*                  { \p s -> decidirPalavra p s }
 
@@ -92,6 +92,8 @@ data TokenClass
   | While
   | For
   | Return
+  | TType
+  | Struct
   | Print
   | Read
   | Inc
@@ -115,6 +117,8 @@ decidirPalavra p s = Token p $ case s of
   "while"  -> While
   "for"    -> For
   "return" -> Return
+  "type"   -> TType
+  "struct" -> Struct
   "print"  -> Print
   "read"   -> Read
   "int"    -> TInt
