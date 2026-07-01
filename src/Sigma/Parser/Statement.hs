@@ -147,12 +147,14 @@ stmt :: IORef Env -> SigmaParser ()
 stmt envRef =
   try (printStmt envRef)
     <|> try (errorStmt envRef)
+    <|> try (pushStmt envRef)
     <|> try (returnStmt envRef)
     <|> try (whileStmt envRef)
     <|> try (forStmt envRef)
     <|> try (ifStmt envRef)
     <|> try incrementStmt
     <|> try indexAssignStmt
+    <|> try fieldAssignStmt
     <|> try assignStmt
     <|> try declAssignStmt
     <|> callStmt envRef
@@ -187,7 +189,8 @@ errorStmt _ = do
   msg <- expr
   _ <- rpToken
   _ <- semicolonToken
-  error (showValue msg)
+  txt <- liftIO (showValueIO msg)
+  error txt
 
 printStmt :: IORef Env -> SigmaParser ()
 printStmt _ = do
@@ -196,7 +199,8 @@ printStmt _ = do
   val <- expr
   _ <- rpToken
   _ <- semicolonToken
-  liftIO $ putStrLn $ showValue val
+  txt <- liftIO (showValueIO val)
+  liftIO $ putStrLn txt
 
 whileStmt :: IORef Env -> SigmaParser ()
 whileStmt envRef = do
@@ -312,6 +316,42 @@ incrementStmt = do
   putState newEnv
   liftIO $ debugEnv newEnv
 
+pushBuiltin :: Token -> Maybe Token
+pushBuiltin tok@(Token _ (Id "push")) = Just tok
+pushBuiltin _ = Nothing
+
+pushStmt :: IORef Env -> SigmaParser ()
+pushStmt _ = do
+  _ <- tokenPrim show update_pos pushBuiltin
+  _ <- lpToken
+  nameToken <- idToken
+  _ <- commaToken
+  val <- expr
+  _ <- rpToken
+  _ <- semicolonToken
+  let name = getId nameToken
+  env <- getState
+  base <- liftIO (derefValue (env_lookup name env))
+  let newBase = case base of
+        VArray vs -> VArray (vs ++ [val])
+        _ -> error ("Type error: push() expects an array as first argument ('" ++ name ++ "' is not an array)")
+  newEnv <- liftIO (assignVar name newBase env)
+  putState newEnv
+  liftIO $ debugEnv newEnv
+
+fieldAssignStmt :: SigmaParser ()
+fieldAssignStmt = do
+  nameToken <- idToken
+  path <- many1 (do _ <- dotToken; f <- idToken; return (getId f))
+  _ <- assignToken
+  val <- expr
+  _ <- semicolonToken
+  let name = getId nameToken
+  env <- getState
+  base <- liftIO (derefValue (env_lookup name env))
+  liftIO (writeFieldPath base path val)
+  liftIO $ debugEnv env
+
 indexAssignStmt :: SigmaParser ()
 indexAssignStmt = do
   nameToken <- idToken
@@ -385,6 +425,7 @@ declAssignStmt = do
         (Token _ TFloat, VMatrix _) -> True
         (Token _ (Id t), VStruct s _) -> t == s
         (Token _ (Id _), VNull) -> True
+        (Token _ (Id _), VArray _) -> True
         _ -> False
 
   let isDeclaredLocally = case env of

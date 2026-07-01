@@ -44,7 +44,6 @@ library
         Sigma.Parser.Core
         Sigma.Parser.Expression
         Sigma.Parser.Statement
-        Sigma.Runtime
     hs-source-dirs:   src
     build-depends:
         base ^>=4.22.0.0,

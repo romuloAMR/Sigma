@@ -118,6 +118,22 @@ toFloat (VFloat d) = VFloat d
 toFloat (VString s) = VFloat (read s)
 toFloat v = v
 
+writeFieldPath :: Value -> [String] -> Value -> IO ()
+writeFieldPath _ [] _ = error "Internal error: empty field path"
+writeFieldPath (VStruct tyName fields) [f] newVal =
+  case lookup f fields of
+    Just (VRef cell) -> writeIORef cell newVal
+    Just _ -> error ("Internal error: field '" ++ f ++ "' of struct '" ++ tyName ++ "' is not a mutable cell")
+    Nothing -> error ("Field error: struct '" ++ tyName ++ "' has no field '" ++ f ++ "'")
+writeFieldPath (VStruct tyName fields) (f : rest) newVal =
+  case lookup f fields of
+    Just (VRef cell) -> do
+      inner <- readIORef cell >>= derefValue
+      writeFieldPath inner rest newVal
+    Just _ -> error ("Internal error: field '" ++ f ++ "' of struct '" ++ tyName ++ "' is not a mutable cell")
+    Nothing -> error ("Field error: struct '" ++ tyName ++ "' has no field '" ++ f ++ "'")
+writeFieldPath _ _ _ = error "Type error: cannot assign a field on a non-struct value"
+
 indexedUpdate :: Value -> [Int] -> Value -> Value
 indexedUpdate _ [] newVal = newVal
 indexedUpdate (VArray vs) (i : rest) newVal =
