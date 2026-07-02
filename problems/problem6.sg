@@ -1,0 +1,122 @@
+type node = struct {
+  value: int;
+  leftChild: node;
+  rightChild: node;
+};
+
+fun insert(ref root: node, v: int): none {
+  if (root == null) {
+    root = node(v, null, null);
+    return;
+  }
+
+  parent: node = root;
+  inserted: bool = false;
+  while (not inserted) {
+    if (v < parent.value) {
+      if (parent.leftChild == null) {
+        parent.leftChild = node(v, null, null);
+        inserted = true;
+      } else {
+        parent = parent.leftChild;
+      }
+    } else {
+      if (parent.rightChild == null) {
+        parent.rightChild = node(v, null, null);
+        inserted = true;
+      } else {
+        parent = parent.rightChild;
+      }
+    }
+  }
+}
+
+fun findMin(root: node, ref minValue, minLevel: int): none {
+  current: node = root;
+  level: int = 0;
+  while (current.leftChild != null) {
+    current = current.leftChild;
+    level = level + 1;
+  }
+  minValue = current.value;
+  minLevel = level;
+}
+
+fun findMax(root: node, ref maxValue, maxLevel: int): none {
+  current: node = root;
+  level: int = 0;
+  while (current.rightChild != null) {
+    current = current.rightChild;
+    level = level + 1;
+  }
+  maxValue = current.value;
+  maxLevel = level;
+}
+
+fun printLevelOrder(root: node): none {
+  if (root == null) {
+    print("Arvore vazia.");
+    return;
+  }
+
+  queue: node[] = [root];
+  levelOf: int[] = [0];
+  front: int = 0;
+  currentLevel: int = -1;
+  lineBuffer: string = "";
+
+  while (front < length(queue)) {
+    current: node = queue[front];
+    lvl: int = levelOf[front];
+    front = front + 1;
+
+    if (lvl != currentLevel) {
+      if (currentLevel >= 0) {
+        print(lineBuffer);
+      }
+      currentLevel = lvl;
+      lineBuffer = "Nivel " + string(lvl) + ": " + string(current.value) + " ";
+    } else {
+      lineBuffer = lineBuffer + string(current.value) + " ";
+    }
+
+    if (current.leftChild != null) {
+      push(queue, current.leftChild);
+      push(levelOf, lvl + 1);
+    }
+    if (current.rightChild != null) {
+      push(queue, current.rightChild);
+      push(levelOf, lvl + 1);
+    }
+  }
+
+  print(lineBuffer);
+}
+
+fun main(): none {
+  root: node = null;
+
+  print("Digite os valores inteiros da arvore (um numero negativo encerra a entrada):");
+  v: int = int(read());
+  while (v >= 0) {
+    insert(root, v);
+    v = int(read());
+  }
+
+  if (root == null) {
+    print("Arvore vazia.");
+  } else {
+    minValue: int = 0;
+    minLevel: int = 0;
+    findMin(root, minValue, minLevel);
+    print("Chave minima: " + string(minValue) + " (nivel " + string(minLevel) + ")");
+
+    maxValue: int = 0;
+    maxLevel: int = 0;
+    findMax(root, maxValue, maxLevel);
+    print("Chave maxima: " + string(maxValue) + " (nivel " + string(maxLevel) + ")");
+
+    print("Arvore em nivel a nivel:");
+    printLevelOrder(root);
+  }
+}

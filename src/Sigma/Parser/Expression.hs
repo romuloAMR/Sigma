@@ -1,7 +1,7 @@
-module Sigma.Parser.Expression (expr, cond, numOp, evalRelop, showValue, errorBuiltin) where
+module Sigma.Parser.Expression (expr, cond, numOp, evalRelop, showValue, showValueIO, errorBuiltin) where
 
 import Control.Monad.IO.Class (liftIO)
-import Data.IORef (readIORef, writeIORef)
+import Data.IORef (newIORef, readIORef, writeIORef)
 import Data.List (intercalate)
 import qualified Data.Map.Strict as M
 import Sigma.Environment
@@ -51,6 +51,12 @@ evalRelop (Token _ Eq) (VString a) (VString b) = a == b
 evalRelop (Token _ NEq) (VString a) (VString b) = a /= b
 evalRelop (Token _ Eq) (VBool a) (VBool b) = a == b
 evalRelop (Token _ NEq) (VBool a) (VBool b) = a /= b
+evalRelop (Token _ Eq) VNull VNull = True
+evalRelop (Token _ Eq) VNull _ = False
+evalRelop (Token _ Eq) _ VNull = False
+evalRelop (Token _ NEq) VNull VNull = False
+evalRelop (Token _ NEq) VNull _ = True
+evalRelop (Token _ NEq) _ VNull = True
 evalRelop _ _ _ = error "Erro de Tipo: Operador relacional usado com tipo invalido"
 
 showValue :: Value -> String
@@ -68,6 +74,20 @@ showValue (VTypeDef _) = "<type>"
 showValue (VFunction {}) = "<function>"
 showValue (VRef _) = "<ref>"
 showValue VVoid = "none"
+showValue VNull = "null"
+
+showValueIO :: Value -> IO String
+showValueIO (VRef cell) = readIORef cell >>= showValueIO
+showValueIO (VArray vs) = do
+  parts <- mapM showValueIO vs
+  return ("[" ++ intercalate ", " parts ++ "]")
+showValueIO (VMatrix vs) = do
+  rows <- mapM (\row -> do parts <- mapM showValueIO row; return ("[" ++ intercalate ", " parts ++ "]")) vs
+  return (intercalate "\n" rows)
+showValueIO (VStruct tyName fields) = do
+  parts <- mapM (\(k, v) -> do s <- showValueIO v; return (k ++ ": " ++ s)) fields
+  return (tyName ++ "{" ++ intercalate ", " parts ++ "}")
+showValueIO v = return (showValue v)
 
 cond :: SigmaParser Bool
 cond = do
@@ -162,7 +182,8 @@ fieldExprRest acc =
   ( do
       _ <- dotToken
       fieldToken <- idToken
-      fieldExprRest (readField acc (getId fieldToken))
+      fieldVal <- liftIO (derefValue (readField acc (getId fieldToken)))
+      fieldExprRest fieldVal
   )
     <|> return acc
 
@@ -195,15 +216,39 @@ errorBuiltin :: Token -> Maybe Token
 errorBuiltin tok@(Token _ (Id "error")) = Just tok
 errorBuiltin _ = Nothing
 
+lengthBuiltin :: Token -> Maybe Token
+lengthBuiltin tok@(Token _ (Id "length")) = Just tok
+lengthBuiltin _ = Nothing
+
 factor :: SigmaParser Value
 factor =
-  ( do
-      tyTok <- castTypeToken
-      _ <- lpToken
-      v <- expr
-      _ <- rpToken
-      return (explicitCast tyTok v)
-  )
+  (do _ <- nullToken; return VNull)
+    <|> ( do
+            _ <- mkTok LB
+            vals <- option [] argList
+            _ <- mkTok RB
+            return (VArray vals)
+        )
+    <|> ( do
+            _ <- tokenPrim show update_pos lengthBuiltin
+            _ <- lpToken
+            v <- expr
+            _ <- rpToken
+            return
+              ( case v of
+                  VArray vs -> VInt (length vs)
+                  VMatrix vs -> VInt (length vs)
+                  VString s -> VInt (length s)
+                  _ -> error "Type error: length() expects an array, matrix or string"
+              )
+        )
+    <|> ( do
+            tyTok <- castTypeToken
+            _ <- lpToken
+            v <- expr
+            _ <- rpToken
+            return (explicitCast tyTok v)
+        )
     <|> ( do
             _ <- readToken
             _ <- lpToken
@@ -317,7 +362,10 @@ structConstructor = do
   _ <- rpToken
   if length args /= length fieldDefs
     then fail ("Struct error: '" ++ name ++ "' expects " ++ show (length fieldDefs) ++ " fields but got " ++ show (length args))
-    else return (VStruct name (zipWith (\(fieldName, _) v -> (fieldName, v)) fieldDefs args))
+    else do
+      cells <- liftIO (mapM newIORef args)
+      let fields = zipWith (\(fieldName, _) cell -> (fieldName, VRef cell)) fieldDefs cells
+      return (VStruct name fields)
 
 argList :: SigmaParser [Value]
 argList = do

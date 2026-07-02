@@ -60,3 +60,6 @@ problem-4: ## Run Problem 4 (DEBUG=1 to show env dumps)
 
 problem-5: ## Run Problem 5 (DEBUG=1 to show env dumps)
 	$(SIGMA_ENV) cabal run sigma -- $(PROBLEMS_DIR)/problem5.sg
+
+problem-6: ## Run Problem 6 (DEBUG=1 to show env dumps)
+	$(SIGMA_ENV) cabal run sigma -- $(PROBLEMS_DIR)/problem6.sg
