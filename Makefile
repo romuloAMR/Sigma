@@ -44,7 +44,7 @@ DEBUG ?=
 SIGMA_ENV = SIGMA_DEBUG=$(DEBUG)
 
 test: ## Merge Sort Test (DEBUG=1 to show env dumps)
-	$(SIGMA_ENV) cabal run sigma < $(PROBLEMS_DIR)/test.sg
+	$(SIGMA_ENV) cabal run sigma -- $(PROBLEMS_DIR)/test.sg
 
 problem-1: ## Run Problem 1 (DEBUG=1 to show env dumps)
 	$(SIGMA_ENV) cabal run sigma -- $(PROBLEMS_DIR)/problem1.sg

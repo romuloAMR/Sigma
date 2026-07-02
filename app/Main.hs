@@ -58,5 +58,5 @@ main = do
 exceptionMessage :: SomeException -> String
 exceptionMessage e =
   case fromException e of
-    Just (ErrorCallWithLocation msg _) -> msg
+    Just (ErrorCall msg) -> msg
     Nothing                            -> show e

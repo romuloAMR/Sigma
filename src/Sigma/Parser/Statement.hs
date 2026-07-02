@@ -147,6 +147,7 @@ stmt :: IORef Env -> SigmaParser ()
 stmt envRef =
   try (printStmt envRef)
     <|> try (errorStmt envRef)
+    <|> try (assertStmt envRef)
     <|> try (pushStmt envRef)
     <|> try (returnStmt envRef)
     <|> try (whileStmt envRef)
@@ -445,3 +446,27 @@ declAssignStmt = do
           updateState (env_insert name typedVal)
           newEnv <- getState
           liftIO $ debugEnv newEnv
+
+assertBuiltin :: Token -> Maybe Token
+assertBuiltin tok@(Token _ (Id "assert")) = Just tok
+assertBuiltin _ = Nothing
+
+assertStmt :: IORef Env -> SigmaParser ()
+assertStmt _ = do
+  _ <- tokenPrim show update_pos assertBuiltin
+  _ <- lpToken
+  val <- expr
+  hasMessage <- optionMaybe commaToken
+  msg <- case hasMessage of
+           Just _ -> do
+               m <- expr
+               liftIO (showValueIO m)
+           Nothing -> return "Assertion failed!"
+           
+  _ <- rpToken
+  _ <- semicolonToken
+
+  case val of
+    VBool True -> return ()
+    VBool False -> error ("Assert Error: " ++ msg)
+    _ -> fail "Type error: assert expects a boolean expression"

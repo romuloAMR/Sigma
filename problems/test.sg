@@ -1,40 +1,203 @@
-fun main () {
-   numbers: int[] = listOf(10, 2, 3, 4, 5, 21, 12, 1002, 42, 67);
-   quickSort(numbers, 0, numbers.size - 1);
-   print(numbers);
+fun testar_inteiros(): none {
+    print("A testar operações com Inteiros...");
+    a: int = 5;
+    b: int = 3;
+    c: int = 2;
+
+    // Operações básicas
+    assert(a + b == 8, "Soma de inteiros falhou");
+    assert(a - b == 2, "Subtração de inteiros falhou");
+    assert(a * b == 15, "Multiplicação de inteiros falhou");
+    assert(a / c == 2, "Divisão inteira falhou (5 div 2 deve ser 2)");
+    assert(a % c == 1, "Módulo de inteiros falhou");
+    assert(b ** c == 9, "Exponenciação de inteiros falhou");
+    assert(-a == 0 - 5, "Menos unitário falhou");
+
+    // Comutatividade
+    assert(a + b == b + a, "Comutatividade da soma falhou");
+    assert(a * b == b * a, "Comutatividade da multiplicação falhou");
+
+    // Associatividade
+    assert((a + b) + c == a + (b + c), "Associatividade da soma falhou");
+    assert((a * b) * c == a * (b * c), "Associatividade da multiplicação falhou");
+
+    // Elementos Neutros
+    assert(a + 0 == a, "Elemento neutro da soma (0) falhou");
+    assert(a * 1 == a, "Elemento neutro da multiplicação (1) falhou");
+
+    // Inverso Aditivo
+    assert(a + (-a) == 0, "Inverso aditivo falhou");
+
+    // Precedência
+    assert(2 + 3 * 4 == 14, "Precedência de * sobre + falhou");
+    assert((2 + 3) * 4 == 20, "Precedência com parêntesis falhou");
+    assert(10 - 4 / 2 == 8, "Precedência de / sobre - falhou");
+    assert(2 * 3 ** 2 == 18, "Precedência de ** sobre * falhou"); 
+
+    print("Teste operações com Int sucesso!");
 }
 
+fun testar_floats(): none {
+    print("A testar operações com Floats...");
+    x: float = 5.0;
+    y: float = 2.0;
+    z: float = 3.0;
 
-fun quickSort(vector: int[], start: int, end: int): none  {
-   if (start < end) {
-       indexPartition: int = partition(vector, start, end);
-       quickSort(vector, start, indexPartition - 1);
-       quickSort(vector, indexPartition + 1, end);
-   }
+    // Operações básicas
+    assert(x + y == 7.0, "Soma de floats falhou");
+    assert(x - y == 3.0, "Subtração de floats falhou");
+    assert(x * y == 10.0, "Multiplicação de floats falhou");
+    assert(x / y == 2.5, "Divisão de floats falhou");
+    assert(y ** z == 8.0, "Exponenciação de floats falhou");
+    assert(-x == 0.0 - x, "Menos unitário em floats falhou");
 
+    // Comutatividade
+    assert(x + y == y + x, "Comutatividade da soma de floats falhou");
+    assert(x * y == y * x, "Comutatividade da multiplicação de floats falhou");
 
+    // Associatividade
+    assert((x + y) + z == x + (y + z), "Associatividade da soma de floats falhou");
+    assert((x * y) * z == x * (y * z), "Associatividade da multiplicação de floats falhou");
+
+    // Elementos Neutros
+    assert(x + 0.0 == x, "Elemento neutro da soma (0.0) falhou");
+    assert(x * 1.0 == x, "Elemento neutro da multiplicação (1.0) falhou");
+
+    // Inverso Aditivo
+    assert(x + (-x) == 0.0, "Inverso aditivo de floats falhou");
+
+    // Precedência
+    assert(2.0 + 3.0 * 4.0 == 14.0, "Precedência de * sobre + falhou");
+    assert((2.0 + 3.0) * 4.0 == 20.0, "Precedência com parêntesis falhou");
+
+    print("Teste operações com Float sucesso!");
 }
 
+fun testar_mistos(): none {
+    print("A testar operações mistas (Int e Float)...");
+    i: int = 5;
+    f: float = 2.0;
 
-fun partition(vector: int[], start: int, end: int): int {
-   pivot: int = vector[end];
-   i: int = start - 1;
+    // Coerção
+    assert(i + f == 7.0, "Soma mista falhou");
+    assert(i - f == 3.0, "Subtração mista falhou");
+    assert(f - i == -3.0, "Subtração mista invertida falhou");
+    assert(i * f == 10.0, "Multiplicação mista falhou");
+    assert(i / f == 2.5, "Divisão mista falhou");
+    assert(i ** f == 25.0, "Exponenciação mista falhou");
+    print("Teste operações mistas com Int e Float sucesso!");
+}
 
+fun testar_booleanos(): none {
+    print("A testar operações com Booleanos...");
+    v: bool = true;
+    f: bool = false;
 
-   for (j: int = start; j < end; j++) {
-       if (vector[j] <= pivot) {
-           i++;
-           temp: int = vector[i];
-           vector[i] = vector[j];
-           vector[j] = temp;
-       }
-   }
+    // Comutatividade
+    assert((v and f) == (f and v), "Comutatividade do AND falhou");
+    assert((v or f) == (f or v), "Comutatividade do OR falhou");
 
+    // Associatividade
+    assert(((v and f) and true) == (v and (f and true)), "Associatividade do AND falhou");
+    assert(((v or f) or false) == (v or (f or false)), "Associatividade do OR falhou");
 
-   temp: int = vector[i + 1];
-   vector[i + 1] = vector[end];
-   vector[end] = temp;
+    // Elementos Neutros
+    assert((v and true) == v, "Elemento neutro do AND (true) falhou para true");
+    assert((f and true) == f, "Elemento neutro do AND (true) falhou para false");
+    assert((v or false) == v, "Elemento neutro do OR (false) falhou para true");
+    assert((f or false) == f, "Elemento neutro do OR (false) falhou para false");
 
+    // Inverso Lógico
+    assert((v or not v) == true, "Princípio do terceiro excluído falhou");
+    assert((v and not v) == false, "Princípio da não-contradição falhou");
 
-   return i + 1;
+    // Precedência
+    assert((not f and f) == false, "Precedência do NOT sobre o AND falhou");
+    assert((v or f and f) == true, "Precedência do AND sobre o OR falhou");
+    assert(((v or f) and f) == false, "Precedência manual com parêntesis falhou");
+
+    print("Teste operações com Booleanos sucesso!");
+}
+
+fun testar_booleanos(): none {
+    print("A testar operações com Booleanos...");
+    v: bool = true;
+    f: bool = false;
+
+    print("Teste operações com Booleanos sucesso!");
+}
+
+fun testar_casting(): none {
+    print("A testar casting...");
+
+    // Casting de e para Inteiros
+    assert(int(5.9) == 5, "Casting float -> int falhou (deve truncar a casa decimal)");
+    assert(int("42") == 42, "Casting string -> int falhou");
+    
+    // Casting de e para Floats
+    assert(float(5) == 5.0, "Casting int -> float falhou");
+    assert(float("3.14") == 3.14, "Casting string -> float falhou");
+
+    // Casting para Strings
+    assert(string(10) == "10", "Casting int -> string falhou");
+    assert(string(2.5) == "2.5", "Casting float -> string falhou");
+    assert(string(true) == "true", "Casting bool -> string falhou");
+
+    // Casting para Booleanos (qualquer int diferente de 0 é true)
+    assert(bool(1) == true, "Casting int(1) -> bool falhou");
+    assert(bool(-5) == true, "Casting int(-5) -> bool falhou");
+    assert(bool(0) == false, "Casting int(0) -> bool falhou");
+
+    print("Teste casting sucesso!");
+}
+
+fun testar_relacionais(): none {
+    print("A testar operadores relacionais...");
+
+    a: int = 5;
+    b: int = 10;
+    c: float = 5.0;
+
+    // Operações Básicas
+    assert(a < b, "Operador < falhou");
+    assert(b > a, "Operador > falhou");
+    assert(a <= 5, "Operador <= falhou");
+    assert(b >= 10, "Operador >= falhou");
+    assert(b == 10, "Operador == falhou");
+    assert(a != b, "Operador != falhou");
+    assert(a == c, "Operador == misto (int e float) falhou");
+    assert(a <= c, "Operador <= misto (int e float) falhou");
+    assert(c >= a, "Operador <= misto (int e float) falhou");
+    assert(b != c, "Operador != misto (int e float) falhou");
+
+    // Comutatividade
+    assert((a == b) == (b == a), "Comutatividade do == falhou");
+    assert((a != b) == (b != a), "Comutatividade do != falhou");
+
+    // Inversões e Equivalências
+    assert((a < b) == (b > a), "Equivalência de < para > falhou");
+    assert((a <= b) == (b >= a), "Equivalência de <= para >= falhou");
+
+    // Precedência
+    assert(a + a == b, "Precedência de + sobre == falhou (5+5 == 10)");
+    assert(2 * a > a + 3, "Precedência de * e + sobre > falhou (10 > 8)");
+    assert(a == 5 and b == 10, "Precedência de == sobre AND falhou");
+    assert(a > 10 or b == 10, "Precedência de relacionais sobre OR falhou");
+    assert(not (a == b), "Aplicação do not sobre a igualdade falhou");
+    assert(not (a > b) == (a <= b), "Equivalência lógica com NOT falhou");
+
+    print("Teste relações sucesso!");
+}
+
+fun main(): none {
+    print("------ TESTES -------");
+    
+    testar_inteiros();
+    testar_floats();
+    testar_mistos();
+    testar_booleanos();
+    testar_casting();
+    testar_relacionais();
+    
+    print("----- SUCESSO! -----");
 }
