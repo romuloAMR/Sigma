@@ -15,14 +15,14 @@ mkTok tc = tokenPrim show update_pos get_tok
     get_tok tok@(Token _ c) = if c == tc then Just tok else Nothing
 
 funToken, lpToken, rpToken, lcbToken, rcbToken, semicolonToken, colonToken, assignToken, printToken, readToken, whileToken, ifToken, forToken, notToken, andToken, orToken, incToken, tintToken, addToken, subToken, multToken, divToken, modToken, expToken, commaToken, typeKwToken, structToken, dotToken, returnToken, refToken, nullToken :: SigmaParser Token
-funToken = mkTok Fun
-lpToken = mkTok LP
-rpToken = mkTok RP
-lcbToken = mkTok LCB
-rcbToken = mkTok RCB
-semicolonToken = mkTok Semicolon
-colonToken = mkTok Colon
-assignToken = mkTok Assign
+funToken = mkTok Fun <?> "'fun' keyword"
+lpToken = mkTok LP <?> "'(' to open parentheses"
+rpToken = mkTok RP <?> "')' to close parentheses"
+lcbToken = mkTok LCB <?> "'{' to open a code block"
+rcbToken = mkTok RCB <?> "'}' to close a code block"
+semicolonToken = mkTok Semicolon <?> "';' at the end of the statement"
+colonToken = mkTok Colon <?> "':' for type annotation"
+assignToken = mkTok Assign <?> "'=' for assignment"
 printToken = mkTok Print
 readToken = mkTok Read
 whileToken = mkTok While
@@ -39,13 +39,13 @@ multToken = mkTok Mult
 divToken = mkTok Div
 modToken = mkTok Mod
 expToken = mkTok Exp
-commaToken = mkTok Comma
-typeKwToken = mkTok TType
-structToken = mkTok Struct
+commaToken = mkTok Comma <?> "','"
+typeKwToken = mkTok TType <?> "'type' keyword"
+structToken = mkTok Struct <?> "'struct' keyword"
 dotToken = mkTok Dot
-returnToken = mkTok Return
-refToken = mkTok Ref
-nullToken = mkTok Null
+returnToken = mkTok Return <?> "'return' keyword"
+refToken = mkTok Ref <?> "'ref' keyword"
+nullToken = mkTok Null <?> "'null' keyword"
 
 idToken, intLitToken, floatLitToken, castTypeToken, typeToken, returnTypeToken, relopToken, nextToken :: SigmaParser Token
 idToken = tokenPrim show update_pos get_tok
