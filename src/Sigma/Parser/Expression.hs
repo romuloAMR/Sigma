@@ -25,10 +25,14 @@ numOp _ _ VVoid = error "Type Error: a function with return type 'none' (or miss
 numOp _ _ _ = error "Type Error: Invalid data type in the mathematical operation"
 
 evalDiv :: Value -> Value -> Value
+evalDiv _ (VInt 0) = error "Runtime error: Division by zero."
+evalDiv _ (VFloat 0.0) = error "Runtime error: Division by zero."
 evalDiv (VInt a) (VInt b) = VInt (a `div` b)
 evalDiv a b = numOp (/) a b
 
 evalMod :: Value -> Value -> Value
+evalMod _ (VInt 0) = error "Runtime error: Division by zero."
+evalMod _ (VFloat 0.0) = error "Runtime error: Division by zero."
 evalMod (VInt a) (VInt b) = VInt (a `mod` b)
 evalMod _ _ = error "Type error: The modulo operator (%) can only be used with integers"
 

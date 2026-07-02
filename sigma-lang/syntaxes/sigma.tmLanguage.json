@@ -23,7 +23,7 @@
     },
     {
       "name": "support.function.sigma",
-      "match": "\\b(print|read|matrizFloat|matrizInt|matrizBool|matrizString)\\b"
+      "match": "\\b(print|read|matrizFloat|matrizInt|matrizBool|matrizString|assert)\\b"
     },
     {
       "name": "entity.name.function.sigma",
